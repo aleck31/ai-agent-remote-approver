@@ -503,12 +503,40 @@ function stripInline(text) {
 export const PRIORITY = Object.freeze({ min: 1, low: 2, default: 3, high: 4, urgent: 5 });
 
 const PREVIEW_MAX_LENGTH = 1000;
+// Commands / code / long free-text are clipped short for the phone; the full
+// text is always visible in the terminal. Titles/paths are not clipped here.
+const CODE_PREVIEW_MAX = 300;
 
 /**
  * Truncate a string to `max` chars, appending "..." when it overflows.
  */
 function clip(text, max) {
   return text.length > max ? text.slice(0, max) + "..." : text;
+}
+
+/**
+ * Wrap literal content (a command, code, a path) in a Markdown code fence so the client renders it verbatim
+ * — otherwise `#`, `*`, `_`, backticks etc. in the content are interpreted as Markdown (a leading `#` becomes an <h1>). 
+ * Uses a fence longer than the longest backtick run inside, per CommonMark, so content containing ``` doesn't terminate the block early.
+ *
+ * @param {string} content
+ * @param {string} [info] - fence info string (e.g. "diff")
+ */
+function codeFence(content, info = "") {
+  let longest = 0;
+  const m = content.match(/`+/g);
+  if (m) for (const run of m) longest = Math.max(longest, run.length);
+  const fence = "`".repeat(Math.max(3, longest + 1));
+  return `${fence}${info}\n${content}\n${fence}`;
+}
+
+/**
+ * Render a path/pattern as inline code so Markdown metacharacters in it
+ * (underscores, asterisks) aren't interpreted. Inline code can't contain a
+ * backtick reliably, so fall back to a fenced block if one is present.
+ */
+function inlineCode(text) {
+  return text.includes("`") ? codeFence(text) : `\`${text}\``;
 }
 
 /**
@@ -530,9 +558,10 @@ export function formatToolPreview(tool_name, tool_input) {
       if (typeof cmd !== "string" || cmd === "") {
         return { message: json(), tags: ["computer"], priority: PRIORITY.high };
       }
-      // Keep the raw command (readable as-is on any client, no fence needed);
-      // prepend the description line when Claude provides one.
-      const msg = input.description ? `${input.description}\n${cmd}` : cmd;
+      // Fence the command so shell metacharacters (#, *, backticks) render
+      // verbatim; the description, when present, is a plain line above it.
+      const fenced = codeFence(clip(cmd, CODE_PREVIEW_MAX));
+      const msg = input.description ? `${input.description}\n${fenced}` : fenced;
       return { message: msg, tags: ["computer"], priority: PRIORITY.high };
     }
 
@@ -543,7 +572,7 @@ export function formatToolPreview(tool_name, tool_input) {
       }
       const content = typeof input.content === "string" ? input.content : "";
       const lineCount = content ? content.split("\n").length : 0;
-      return { message: `**${path}**\n${lineCount} lines`, tags: ["pencil2"], priority: PRIORITY.high };
+      return { message: `${inlineCode(path)} — ${lineCount} lines`, tags: ["pencil2"], priority: PRIORITY.high };
     }
 
     case "Edit": {
@@ -555,8 +584,10 @@ export function formatToolPreview(tool_name, tool_input) {
       const newStr = typeof input.new_string === "string" ? input.new_string : "";
       const oldP = clip(oldStr, 200);
       const newP = clip(newStr, 200);
+      // One fence long enough for both sides, so a ``` inside old/new can't break it.
+      const diff = codeFence(`- ${oldP}\n+ ${newP}`, "diff");
       return {
-        message: `**${path}**\n\`\`\`diff\n- ${oldP}\n+ ${newP}\n\`\`\``,
+        message: `${inlineCode(path)}\n${diff}`,
         tags: ["pencil2"],
         priority: PRIORITY.high,
       };
@@ -567,7 +598,7 @@ export function formatToolPreview(tool_name, tool_input) {
       if (typeof path !== "string") {
         return { message: json(), tags: ["eyes"], priority: PRIORITY.high };
       }
-      return { message: `**${path}**`, tags: ["eyes"], priority: PRIORITY.high };
+      return { message: inlineCode(path), tags: ["eyes"], priority: PRIORITY.high };
     }
 
     case "Glob":
@@ -577,23 +608,23 @@ export function formatToolPreview(tool_name, tool_input) {
         return { message: json(), tags: ["mag"], priority: PRIORITY.high };
       }
       const where = input.path || ".";
-      return { message: `\`${pattern}\` in \`${where}\``, tags: ["mag"], priority: PRIORITY.high };
+      return { message: `${inlineCode(pattern)} in ${inlineCode(where)}`, tags: ["mag"], priority: PRIORITY.high };
     }
 
     case "WebFetch": {
       const url = input.url;
       if (typeof url !== "string") return { message: json(), tags: ["globe_with_meridians"], priority: PRIORITY.high };
-      return { message: url, tags: ["globe_with_meridians"], priority: PRIORITY.high };
+      return { message: inlineCode(url), tags: ["globe_with_meridians"], priority: PRIORITY.high };
     }
 
     case "WebSearch": {
       const query = input.query;
       if (typeof query !== "string") return { message: json(), tags: ["globe_with_meridians"], priority: PRIORITY.high };
-      return { message: `*${query}*`, tags: ["globe_with_meridians"], priority: PRIORITY.high };
+      return { message: inlineCode(query), tags: ["globe_with_meridians"], priority: PRIORITY.high };
     }
 
     case "Task": {
-      const desc = input.description || "";
+      const desc = clip(input.description || "", CODE_PREVIEW_MAX);
       const agent = input.subagent_type || "";
       const msg = agent ? `**[${agent}]** ${desc}` : desc || json();
       return { message: msg, tags: ["robot"], priority: PRIORITY.high };

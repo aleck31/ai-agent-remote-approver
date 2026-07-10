@@ -222,7 +222,7 @@ describe("formatToolInfo", () => {
     );
   });
 
-  it("should truncate long Bash command to 1000 characters and append '...'", () => {
+  it("should clip a long Bash command to 300 chars (inside a code fence) and append '...'", () => {
     const longCommand = "x".repeat(1500);
     const result = formatToolInfo({
       hook_event_name: "PreToolUse",
@@ -230,43 +230,44 @@ describe("formatToolInfo", () => {
       tool_input: { command: longCommand },
     });
 
-    assert.ok(
-      result.message.length <= 1003,
-      `Message should be at most 1003 characters (1000 + "..."), got length: ${result.message.length}`
-    );
-    assert.ok(
-      result.message.endsWith("..."),
-      `Message should end with "..." when truncated`
-    );
+    // Command is fenced; the clipped body is 300 chars + "..." between the fences.
+    assert.ok(result.message.startsWith("```\n") && result.message.endsWith("\n```"), `should be fenced, got: ${result.message.slice(0, 12)}…`);
+    const body = result.message.slice(4, -4);
+    assert.equal(body, "x".repeat(300) + "...", "command body should be clipped to 300 chars + ...");
   });
 
-  it("should not truncate messages shorter than 1000 characters", () => {
-    const shortCommand = "x".repeat(500);
+  it("should fence a short Bash command without clipping", () => {
+    const shortCommand = "echo hello";
     const result = formatToolInfo({
       hook_event_name: "PreToolUse",
       tool_name: "Bash",
       tool_input: { command: shortCommand },
     });
 
-    assert.equal(
-      result.message,
-      shortCommand,
-      "Short messages should not be truncated"
-    );
+    assert.equal(result.message, "```\n" + shortCommand + "\n```", "short command should be fenced verbatim");
   });
 
-  it("should not truncate a message that is exactly 1000 characters", () => {
-    const exactCommand = "x".repeat(1000);
+  it("should render a leading '#' in a Bash command literally (fenced), not as an H1", () => {
     const result = formatToolInfo({
       hook_event_name: "PreToolUse",
       tool_name: "Bash",
-      tool_input: { command: exactCommand },
+      tool_input: { command: "# cleanup\nrm -rf build/*" },
     });
-    assert.equal(
-      result.message,
-      exactCommand,
-      "Exactly 1000-char message should not be truncated"
-    );
+    // The '#' and '*' survive verbatim inside the fence.
+    assert.ok(result.message.includes("# cleanup"), "comment line preserved");
+    assert.ok(result.message.includes("rm -rf build/*"), "glob preserved");
+    assert.ok(result.message.startsWith("```\n"), "wrapped in a code fence");
+  });
+
+  it("should widen the fence when the command itself contains a triple backtick", () => {
+    const result = formatToolInfo({
+      hook_event_name: "PreToolUse",
+      tool_name: "Bash",
+      tool_input: { command: "echo '```'" },
+    });
+    // A 3-backtick run inside forces a 4-backtick fence so the block isn't cut short.
+    assert.ok(result.message.startsWith("````\n"), `expected a 4-backtick fence, got: ${result.message.slice(0, 6)}`);
+    assert.ok(result.message.includes("```"), "inner triple backtick preserved");
   });
 
   it("should truncate long messages from unknown tools via default branch", () => {
