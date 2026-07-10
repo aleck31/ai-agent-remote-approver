@@ -1,4 +1,4 @@
-# agent-remote-approver
+# Remote Approver for AI Agent
 
 Approve / deny AI coding agent permission prompts from your phone — via **ntfy**. Works with **Claude Code** today (incl. **plain Bedrock**, no claude.ai / Console auth needed); other agents (e.g. **kiro-cli**) can be added via adapters. Also sends completion notifications.
 

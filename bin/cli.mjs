@@ -12,7 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import qrcode from "qrcode-terminal";
-import { ASK } from "../src/hook.mjs";
+import { ASK } from "../src/adapters/claude-code.mjs";
 
 const USAGE =
   "Usage: agent-remote-approver <command>\n\nCommands:\n  setup       Set up remote approval\n  test        Send a test notification (add --wait to verify the round trip)\n  status      Show current configuration\n  enable      Re-enable the hook\n  disable     Temporarily disable the hook\n  uninstall   Remove hook and delete configuration\n  hook        Process a Claude Code hook (internal)\n";
@@ -246,7 +246,7 @@ if (isMain) {
     "../src/ntfy.mjs"
   );
   const { randomUUID } = await import("node:crypto");
-  const { processHook } = await import("../src/hook.mjs");
+  const { processHook } = await import("../src/adapters/claude-code.mjs");
   const { runSetup, registerHook, getHookCommand, unregisterHook, registerStopHook, unregisterStopHook } = await import("../src/setup.mjs");
 
   const args = process.argv.slice(2);

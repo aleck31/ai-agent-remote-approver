@@ -1,5 +1,5 @@
 /**
- * Test suite for src/hook.mjs — processHook permission flow
+ * Test suite for src/adapters/claude-code.mjs — processHook permission flow
  *
  * Coverage:
  * - processHook (main describe)
@@ -9,7 +9,7 @@
 
 import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-import { processHook, _internal } from "../src/hook.mjs";
+import { processHook, _internal } from "../src/adapters/claude-code.mjs";
 import { createDeps, sampleInput } from "./helpers.mjs";
 
 // Dynamic import helper — buildAuthHeader does not exist yet (TDD Red phase).

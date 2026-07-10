@@ -1,5 +1,5 @@
 /**
- * Test suite for src/hook.mjs — processStop
+ * Test suite for src/adapters/claude-code.mjs — processStop
  *
  * Coverage:
  * - processStop
@@ -7,7 +7,7 @@
 
 import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-import { processStop } from "../src/hook.mjs";
+import { processStop } from "../src/adapters/claude-code.mjs";
 
 // ---------------------------------------------------------------------------
 // processStop

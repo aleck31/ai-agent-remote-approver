@@ -1,5 +1,5 @@
 /**
- * Test suite for src/hook.mjs — processAskUserQuestion
+ * Test suite for src/adapters/claude-code.mjs — processAskUserQuestion
  *
  * Coverage:
  * - processAskUserQuestion
@@ -7,7 +7,7 @@
 
 import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-import { processAskUserQuestion, _internal } from "../src/hook.mjs";
+import { processAskUserQuestion, _internal } from "../src/adapters/claude-code.mjs";
 
 // Dynamic import helper — buildAuthHeader does not exist yet (TDD Red phase).
 // Using a lazy getter avoids a static import error that would prevent ALL tests from loading.

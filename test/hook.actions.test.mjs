@@ -1,5 +1,5 @@
 /**
- * Test suite for src/hook.mjs — action builders and utilities
+ * Test suite for src/adapters/claude-code.mjs — action builders and utilities
  *
  * Coverage:
  * - buildActions
@@ -11,7 +11,7 @@
 
 import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-import { buildActions, sendWithRetry, RETRY_DELAY_MS, _internal, isAskUserQuestion, buildQuestionActions, buildQuestionMessage } from "../src/hook.mjs";
+import { buildActions, sendWithRetry, RETRY_DELAY_MS, _internal, isAskUserQuestion, buildQuestionActions, buildQuestionMessage } from "../src/adapters/claude-code.mjs";
 
 // Dynamic import helper — buildAuthHeader does not exist yet (TDD Red phase).
 // Using a lazy getter avoids a static import error that would prevent ALL tests from loading.

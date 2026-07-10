@@ -1,8 +1,10 @@
-// src/hook.mjs
+// src/adapters/claude-code.mjs — Claude Code hook adapter.
+// Translates Claude Code's PermissionRequest/Stop hook contract to the shared
+// ntfy core. Other agents get their own adapter alongside this one.
 
 import crypto from "node:crypto";
-import { DEFAULT_CONFIG } from "./config.mjs";
-import { buildAuthHeader, sessionTag, formatStopNotification } from "./ntfy.mjs";
+import { DEFAULT_CONFIG } from "../config.mjs";
+import { buildAuthHeader, sessionTag, formatStopNotification } from "../ntfy.mjs";
 
 export const ASK = Object.freeze({ hookSpecificOutput: Object.freeze({ hookEventName: "PermissionRequest", decision: Object.freeze({ behavior: "ask" }) }) });
 const DENY = Object.freeze({ hookSpecificOutput: Object.freeze({ hookEventName: "PermissionRequest", decision: Object.freeze({ behavior: "deny" }) }) });
