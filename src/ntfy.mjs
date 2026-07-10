@@ -152,7 +152,7 @@ export async function waitForResponse({ server, topic, requestId, timeout, auth,
     if (timedOut || err?.name === "AbortError") {
       return { timeout: true };
     }
-    console.error("[agent-remote-approver] waitForResponse error:", err.message ?? err);
+    console.error("[remote-approver] waitForResponse error:", err.message ?? err);
     return { error: err };
   }
 }

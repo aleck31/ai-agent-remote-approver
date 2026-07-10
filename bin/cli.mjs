@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * CLI entry point for agent-remote-approver.
+ * CLI entry point for remote-approver.
  *
  * Subcommands: setup | test | status | enable | disable | uninstall | hook
  * All I/O goes through the injected `deps` object so the module is fully testable.
@@ -15,7 +15,7 @@ import qrcode from "qrcode-terminal";
 import { ASK } from "../src/adapters/claude-code.mjs";
 
 const USAGE =
-  "Usage: agent-remote-approver <command>\n\nCommands:\n  setup       Set up remote approval\n  test        Send a test notification (add --wait to verify the round trip)\n  status      Show current configuration\n  enable      Re-enable the hook\n  disable     Temporarily disable the hook\n  uninstall   Remove hook and delete configuration\n  hook        Process a Claude Code hook (internal)\n";
+  "Usage: remote-approver <command>\n\nCommands:\n  setup       Set up remote approval\n  test        Send a test notification (add --wait to verify the round trip)\n  status      Show current configuration\n  enable      Re-enable the hook\n  disable     Temporarily disable the hook\n  uninstall   Remove hook and delete configuration\n  hook        Process a Claude Code hook (internal)\n";
 
 // ---------------------------------------------------------------------------
 // main
@@ -62,7 +62,7 @@ export async function main(args, deps) {
     case "test": {
       const config = deps.loadConfig();
       if (!config.topic) {
-        deps.stderr.write("Error: No topic configured. Run 'agent-remote-approver setup' first.\n");
+        deps.stderr.write("Error: No topic configured. Run 'remote-approver setup' first.\n");
         break;
       }
       const auth = deps.resolveAuth(config);
@@ -119,7 +119,7 @@ export async function main(args, deps) {
           auth,
         });
         deps.stdout.write("Test notification sent successfully.\n");
-        deps.stdout.write("Tip: run 'agent-remote-approver test --wait' to verify the full round trip (tap a button on your phone).\n");
+        deps.stdout.write("Tip: run 'remote-approver test --wait' to verify the full round trip (tap a button on your phone).\n");
       } catch (err) {
         deps.stderr.write(`Error: Failed to send notification: ${err.message}\n`);
       }
@@ -145,7 +145,7 @@ export async function main(args, deps) {
       try {
         input = JSON.parse(deps.stdin);
       } catch {
-        deps.stderr.write("[agent-remote-approver] Invalid hook input. Falling back to CLI.\n");
+        deps.stderr.write("[remote-approver] Invalid hook input. Falling back to CLI.\n");
         deps.stdout.write(JSON.stringify(ASK) + "\n");
         break;
       }
@@ -154,7 +154,7 @@ export async function main(args, deps) {
       try {
         result = await deps.processHook(input, deps);
       } catch {
-        deps.stderr.write("[agent-remote-approver] Hook processing failed. Falling back to CLI.\n");
+        deps.stderr.write("[remote-approver] Hook processing failed. Falling back to CLI.\n");
         deps.stdout.write(JSON.stringify(ASK) + "\n");
         break;
       }
@@ -191,14 +191,14 @@ export async function main(args, deps) {
         deps.stderr.write(`Error: Failed to disable hook: ${err.message}\n`);
         break;
       }
-      deps.stdout.write("Hook disabled. Run 'agent-remote-approver enable' to re-enable.\n");
+      deps.stdout.write("Hook disabled. Run 'remote-approver enable' to re-enable.\n");
       break;
     }
 
     case "enable": {
       const config = deps.loadConfig();
       if (!config.topic) {
-        deps.stderr.write("Error: No topic configured. Run 'agent-remote-approver setup' first.\n");
+        deps.stderr.write("Error: No topic configured. Run 'remote-approver setup' first.\n");
         deps.exit(1);
         break;
       }

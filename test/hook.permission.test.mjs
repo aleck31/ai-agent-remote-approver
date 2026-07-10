@@ -260,7 +260,7 @@ describe("processHook", () => {
       assert.equal(errorSpy.mock.callCount(), 1);
       const args = errorSpy.mock.calls[0].arguments;
       assert.ok(
-        args[0].includes("[agent-remote-approver]") && args[0].includes("Notification failed after 3 attempts:"),
+        args[0].includes("[remote-approver]") && args[0].includes("Notification failed after 3 attempts:"),
         `console.error first arg should have prefix and message, got: ${args[0]}`
       );
       assert.equal(args[1], "network error", "should include err.message");
@@ -286,7 +286,7 @@ describe("processHook", () => {
       assert.equal(errorSpy.mock.callCount(), 1);
       const args = errorSpy.mock.calls[0].arguments;
       assert.ok(
-        args[0].includes("[agent-remote-approver]") && args[0].includes("Response listener failed:"),
+        args[0].includes("[remote-approver]") && args[0].includes("Response listener failed:"),
         `console.error first arg should have prefix and message, got: ${args[0]}`
       );
       assert.equal(args[1], "timeout exceeded", "should include err.message");
@@ -436,7 +436,7 @@ describe("processHook", () => {
       assert.equal(errorSpy.mock.callCount(), 1);
       const args = errorSpy.mock.calls[0].arguments;
       assert.ok(
-        args[0].includes("[agent-remote-approver]") && args[0].includes("Timed out waiting for response"),
+        args[0].includes("[remote-approver]") && args[0].includes("Timed out waiting for response"),
         `should log timeout message with prefix, got: ${args[0]}`
       );
     } finally {
@@ -454,7 +454,7 @@ describe("processHook", () => {
       assert.equal(errorSpy.mock.callCount(), 1);
       const args = errorSpy.mock.calls[0].arguments;
       assert.ok(
-        args[0].includes("[agent-remote-approver]") && args[0].includes("Response error:"),
+        args[0].includes("[remote-approver]") && args[0].includes("Response error:"),
         `should log error message with prefix, got: ${args[0]}`
       );
       assert.equal(args[1], "SSE failure", "should include error message");

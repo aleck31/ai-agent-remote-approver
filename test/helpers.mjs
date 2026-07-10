@@ -1,5 +1,5 @@
 /**
- * Shared test helpers for the agent-remote-approver test suite.
+ * Shared test helpers for the remote-approver test suite.
  */
 
 import { mock } from "node:test";

@@ -336,7 +336,7 @@ describe("processAskUserQuestion", () => {
       assert.equal(errorSpy.mock.callCount(), 1);
       const args = errorSpy.mock.calls[0].arguments;
       assert.ok(
-        args[0].includes("[agent-remote-approver]") && args[0].includes("Response listener failed:"),
+        args[0].includes("[remote-approver]") && args[0].includes("Response listener failed:"),
         `should have prefix and message, got: ${args[0]}`
       );
       assert.equal(args[1], "connection lost", "should include err.message");
@@ -373,7 +373,7 @@ describe("processAskUserQuestion", () => {
       assert.equal(errorSpy.mock.callCount(), 1);
       const args = errorSpy.mock.calls[0].arguments;
       assert.ok(
-        args[0].includes("[agent-remote-approver]") && args[0].includes("No answer received"),
+        args[0].includes("[remote-approver]") && args[0].includes("No answer received"),
         `should log no answer message with prefix, got: ${args[0]}`
       );
     } finally {
@@ -411,7 +411,7 @@ describe("processAskUserQuestion", () => {
       assert.equal(errorSpy.mock.callCount(), 1);
       const args = errorSpy.mock.calls[0].arguments;
       assert.ok(
-        args[0].includes("[agent-remote-approver]") && args[0].includes("Notification failed after 3 attempts:"),
+        args[0].includes("[remote-approver]") && args[0].includes("Notification failed after 3 attempts:"),
         `should have prefix and notification failed message, got: ${args[0]}`
       );
       assert.equal(args[1], "rate limited", "should include err.message");

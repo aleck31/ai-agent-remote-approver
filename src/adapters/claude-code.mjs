@@ -69,7 +69,7 @@ export async function sendWithRetry(sendFn, params) {
       return await sendFn(params);
     } catch (err) {
       if (i === MAX_RETRIES - 1) {
-        console.error(`[agent-remote-approver] Notification failed after ${MAX_RETRIES} attempts:`, err.message, "— Falling back to CLI.");
+        console.error(`[remote-approver] Notification failed after ${MAX_RETRIES} attempts:`, err.message, "— Falling back to CLI.");
         return null;
       }
       await _internal.delay(RETRY_DELAY_MS * (i + 1));
@@ -239,7 +239,7 @@ export async function processAskUserQuestion(input, deps) {
         }
         return ASK;
       }
-      console.error("[agent-remote-approver] Response listener failed:", err.message, "— Falling back to CLI.");
+      console.error("[remote-approver] Response listener failed:", err.message, "— Falling back to CLI.");
       return ASK;
     }
 
@@ -252,7 +252,7 @@ export async function processAskUserQuestion(input, deps) {
         ...(auth && { auth }),
       });
     } else {
-      console.error("[agent-remote-approver] No answer received. Falling back to CLI.");
+      console.error("[remote-approver] No answer received. Falling back to CLI.");
       return ASK;
     }
   }
@@ -377,18 +377,18 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
     });
   } catch (err) {
     if (err === SEND_FAILED) return ASK;
-    console.error("[agent-remote-approver] Response listener failed:", err.message, "— Falling back to CLI.");
+    console.error("[remote-approver] Response listener failed:", err.message, "— Falling back to CLI.");
     await resolve("timeout");
     return ASK;
   }
 
   if (response.timeout) {
-    console.error("[agent-remote-approver] Timed out waiting for response. Falling back to CLI.");
+    console.error("[remote-approver] Timed out waiting for response. Falling back to CLI.");
     await resolve("timeout");
     return ASK;
   }
   if (response.error) {
-    console.error("[agent-remote-approver] Response error:", response.error.message, "— Falling back to CLI.");
+    console.error("[remote-approver] Response error:", response.error.message, "— Falling back to CLI.");
     await resolve("timeout");
     return ASK;
   }

@@ -95,7 +95,7 @@ function createDeps(overrides = {}) {
         overrides.setupResult ?? {
           topic: "cra-generated123",
           ntfyServer: "https://ntfy.sh",
-          configPath: "/home/user/.agent-remote-approver.json",
+          configPath: "/home/user/.remote-approver.json",
           settingsPath: "/home/user/.claude/settings.json",
         },
     ),
@@ -188,7 +188,7 @@ describe("main", () => {
         setupResult: {
           topic: "cra-custom123",
           ntfyServer: "https://ntfy.example.com",
-          configPath: "/home/user/.agent-remote-approver.json",
+          configPath: "/home/user/.remote-approver.json",
           settingsPath: "/home/user/.claude/settings.json",
         },
       });
@@ -212,7 +212,7 @@ describe("main", () => {
         setupResult: {
           topic: "cra-selfhost123",
           ntfyServer: "http://192.168.1.100:8080",
-          configPath: "/home/user/.agent-remote-approver.json",
+          configPath: "/home/user/.remote-approver.json",
           settingsPath: "/home/user/.claude/settings.json",
         },
       });
@@ -238,7 +238,7 @@ describe("main", () => {
         setupResult: {
           topic: "cra-invalidurl123",
           ntfyServer: "not-a-valid-url",
-          configPath: "/home/user/.agent-remote-approver.json",
+          configPath: "/home/user/.remote-approver.json",
           settingsPath: "/home/user/.claude/settings.json",
         },
       });
@@ -648,7 +648,7 @@ describe("main", () => {
 
       const errOutput = stderr.output();
       assert.ok(
-        errOutput.includes("[agent-remote-approver]") && errOutput.includes("Invalid hook input"),
+        errOutput.includes("[remote-approver]") && errOutput.includes("Invalid hook input"),
         `stderr should contain prefixed fallback message, got: ${errOutput}`,
       );
     });
@@ -673,7 +673,7 @@ describe("main", () => {
 
       const errOutput = stderr.output();
       assert.ok(
-        errOutput.includes("[agent-remote-approver]") && errOutput.includes("Hook processing failed"),
+        errOutput.includes("[remote-approver]") && errOutput.includes("Hook processing failed"),
         `stderr should contain prefixed fallback message, got: ${errOutput}`,
       );
     });

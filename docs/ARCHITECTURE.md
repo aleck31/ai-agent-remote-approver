@@ -1,6 +1,6 @@
 # Architecture
 
-`agent-remote-approver` is **serverless**: there is no daemon. Claude Code spawns
+`remote-approver` is **serverless**: there is no daemon. Claude Code spawns
 a short-lived hook process for each event; that process talks to ntfy and returns
 a decision on stdout. State lives only in ntfy's topic + the config file.
 
@@ -15,9 +15,10 @@ Claude Code ──spawn──▶ node bin/cli.mjs hook          (per event, stdi
 ```
 
 - **ntfy** — HTTP pub/sub. The approver publishes to `{topic}` and listens on
-  `{topic}-response`. Self-hostable (see [`../deploy/README.md`](../deploy/README.md)).
-- **Config** — `~/.agent-remote-approver.json` (server URL, topic, auth, timeouts,
-  `notifyOnStop`). No secrets live in the repo.
+  `{topic}-response`. Self-hostable (see [`../ntfy-server/README.md`](../ntfy-server/README.md)).
+- **Config** — `$XDG_CONFIG_HOME/remote-approver/config.json` (default
+  `~/.config/remote-approver/config.json`). Holds server URL, topic, auth,
+  timeouts, `notifyOnStop`. No secrets live in the repo.
 - **Hooks** — registered in `~/.claude/settings.json` under `PermissionRequest`
   (approve/deny, AskUserQuestion, plan review) and `Stop` (completion). Both run
   the same `cli.mjs hook`; it branches on `hook_event_name`.
@@ -26,11 +27,11 @@ Claude Code ──spawn──▶ node bin/cli.mjs hook          (per event, stdi
 
 | File | Responsibility |
 |---|---|
-| `bin/cli.mjs` | CLI entry: `setup/test[ --wait]/status/enable/disable/uninstall/hook`. Reads stdin, calls `processHook`, writes decision to stdout. Wires deps (incl. `updateNotification = sendNotification`). `test --wait` does a full round-trip check (publish an Ack button, block on `waitForResponse`). |
-| `src/hook.mjs` | Core logic: `processHook`, `processAskUserQuestion`, `processStop`, `buildActions`, `sendWithRetry`, `sendResolved`, `ASK`/`DENY` constants. |
-| `src/ntfy.mjs` | ntfy I/O + formatting: `sendNotification`, `waitForResponse` (SSE), `formatToolInfo`/`formatToolPreview`, `sessionTag`, `formatStopNotification`, `stripMarkdown`, `PRIORITY`. |
-| `src/config.mjs` | Load/validate/save config; `generateTopic`; `resolveAuth`. |
-| `src/setup.mjs` | Register/unregister hooks in settings.json (`PermissionRequest` + `Stop`); `runSetup`. |
+| `bin/cli.mjs` | CLI entry: `setup/test[ --wait]/status/enable/disable/uninstall/hook`. Reads stdin, calls the adapter's `processHook`, writes decision to stdout. Wires deps (incl. `updateNotification = sendNotification`). `test --wait` does a full round-trip check (publish an Ack button, block on `waitForResponse`). |
+| `src/adapters/claude-code.mjs` | Claude Code adapter: `processHook`, `processAskUserQuestion`, `processStop`, `buildActions`, `sendWithRetry`, `sendResolved`, `ASK`/`DENY` constants. Translates the CC hook contract to the shared ntfy core. |
+| `src/ntfy.mjs` | Agent-agnostic ntfy core: `sendNotification`, `waitForResponse` (SSE), `formatToolInfo`/`formatToolPreview`, `sessionTag`, `formatStopNotification`, `stripMarkdown`, `PRIORITY`. |
+| `src/config.mjs` | Load/validate/save config (XDG path + legacy fallback); `generateTopic`; `resolveAuth`. |
+| `src/setup.mjs` | Register/unregister hooks in settings.json (`PermissionRequest` + `Stop`); `getHookCommand` (stable global command, else absolute-path fallback); `runSetup`. |
 | `test/*.test.mjs` | Node built-in test runner; shared mocks in `test/helpers.mjs`. |
 
 ## PermissionRequest lifecycle (`processHook`)
@@ -66,11 +67,12 @@ is purely cosmetic (tell them apart on the phone).
   The tool never denies or approves on its own due to an error.
 - **`deny`/`ask` rules still apply**: per Claude Code, a hook `allow` does not
   override a matching deny/ask permission rule.
-- **No secrets in-repo**: credentials live in `~/.agent-remote-approver.json`
-  (and env). Self-hosted ntfy is `deny-all` + Basic auth over TLS.
+- **No secrets in-repo**: credentials live in the config file (and env).
+  Self-hosted ntfy is `deny-all` + Basic auth over TLS.
 
 ## Extending
 
 - New per-tool preview: add a case in `formatToolPreview` (`src/ntfy.mjs`).
-- New resolved-outcome label: add to the `RESOLVED` map (`src/hook.mjs`).
+- New resolved-outcome label: add to the `RESOLVED` map (`src/adapters/claude-code.mjs`).
 - New hook event: branch in `processHook` and register it in `src/setup.mjs`.
+- New agent: add `src/adapters/<agent>.mjs` translating its hook contract to the ntfy core.
