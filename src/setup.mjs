@@ -3,21 +3,47 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
- * Returns true if the entry belongs to this tool (its hook command path
- * contains our name). Used to find/replace/remove only our own hook entries.
+ * Returns true if the entry belongs to this tool (its hook command contains our
+ * name). Used to find/replace/remove only our own hook entries.
  */
 function isCraEntry(entry) {
-  const marks = ["agent-remote-approver"];
+  const marks = ["remote-approver"];
   const hit = (s) => typeof s === "string" && marks.some((m) => s.includes(m));
   if (entry.hooks?.some((h) => hit(h.command))) return true;
   if (hit(entry.command)) return true;
   return false;
 }
 
+const BIN_NAME = "remote-approver";
+
 /**
- * Returns the hook command string: `node <absolute_path_to_bin/cli.mjs> hook`
+ * True if `remote-approver` is resolvable on $PATH (installed globally via
+ * `npm i -g` / `npm link`). Injectable for tests.
  */
-export function getHookCommand() {
+export function isGloballyInstalled(env = process.env) {
+  const dirs = (env.PATH || "").split(path.delimiter).filter(Boolean);
+  return dirs.some((d) => {
+    try {
+      return fs.existsSync(path.join(d, BIN_NAME));
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
+ * The hook command Claude Code will run per event.
+ *
+ * Prefers the stable global command `remote-approver hook` when the tool
+ * is installed on $PATH — that survives the repo being moved/renamed/deleted.
+ * Falls back to `node "<abs>/bin/cli.mjs" hook` for a not-yet-installed checkout
+ * (dev use); note this absolute path breaks if the repo later moves, so install
+ * globally (`npm link`) for a durable hook.
+ */
+export function getHookCommand({ globallyInstalled = isGloballyInstalled() } = {}) {
+  if (globallyInstalled) {
+    return `${BIN_NAME} hook`;
+  }
   const cliPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "bin", "cli.mjs");
   if (!fs.existsSync(cliPath)) {
     throw new Error(`CLI entry point not found: ${cliPath}`);

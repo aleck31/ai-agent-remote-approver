@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { runSetup, registerHook, getHookCommand, unregisterHook } from "../src/setup.mjs";
+import { runSetup, registerHook, getHookCommand, unregisterHook, isGloballyInstalled } from "../src/setup.mjs";
 
 // ===========================================================================
 // runSetup
@@ -28,7 +28,7 @@ describe("runSetup", () => {
 
   before(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cra-setup-test-"));
-    tmpConfigPath = path.join(tmpDir, ".agent-remote-approver.json");
+    tmpConfigPath = path.join(tmpDir, ".remote-approver.json");
     tmpSettingsPath = path.join(tmpDir, "settings.json");
   });
 
@@ -307,7 +307,7 @@ describe("registerHook", () => {
 
   it("should set PermissionRequest to the correct hook structure", () => {
     const settingsPath = path.join(tmpDir, "structure-test.json");
-    const hookCommand = "node /usr/local/lib/node_modules/agent-remote-approver/src/hook.mjs";
+    const hookCommand = "node /usr/local/lib/node_modules/remote-approver/src/hook.mjs";
 
     registerHook(settingsPath, hookCommand);
 
@@ -321,19 +321,19 @@ describe("registerHook", () => {
     });
   });
 
-  it("should update existing agent-remote-approver hook in place", () => {
+  it("should update existing remote-approver hook in place", () => {
     const settingsPath = path.join(tmpDir, "overwrite-test.json");
     const existingSettings = {
       hooks: {
         PermissionRequest: [
           { hooks: [{ type: "command", command: "echo other-hook" }] },
-          { hooks: [{ type: "command", command: "node /old/path/agent-remote-approver/src/hook.mjs" }] },
+          { hooks: [{ type: "command", command: "node /old/path/remote-approver/src/hook.mjs" }] },
         ],
       },
     };
     fs.writeFileSync(settingsPath, JSON.stringify(existingSettings, null, 2));
 
-    const newCommand = "node /new/path/agent-remote-approver/src/hook.mjs";
+    const newCommand = "node /new/path/remote-approver/src/hook.mjs";
     registerHook(settingsPath, newCommand);
 
     const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
@@ -341,16 +341,16 @@ describe("registerHook", () => {
     assert.deepEqual(
       settings.hooks.PermissionRequest[0].hooks[0].command,
       "echo other-hook",
-      "non-agent-remote-approver entry should be preserved"
+      "non-remote-approver entry should be preserved"
     );
     assert.deepEqual(
       settings.hooks.PermissionRequest[1],
       { hooks: [{ type: "command", command: newCommand }] },
-      "agent-remote-approver entry should be updated in place"
+      "remote-approver entry should be updated in place"
     );
   });
 
-  it("should preserve existing non-agent-remote-approver PermissionRequest hooks", () => {
+  it("should preserve existing non-remote-approver PermissionRequest hooks", () => {
     const settingsPath = path.join(tmpDir, "preserve-perm-hooks.json");
     const existingSettings = {
       hooks: {
@@ -362,7 +362,7 @@ describe("registerHook", () => {
     };
     fs.writeFileSync(settingsPath, JSON.stringify(existingSettings, null, 2));
 
-    const newCommand = "node /path/to/agent-remote-approver/src/hook.mjs";
+    const newCommand = "node /path/to/remote-approver/src/hook.mjs";
     registerHook(settingsPath, newCommand);
 
     const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
@@ -380,7 +380,7 @@ describe("registerHook", () => {
     assert.deepEqual(
       settings.hooks.PermissionRequest[2],
       { hooks: [{ type: "command", command: newCommand }] },
-      "new agent-remote-approver hook should be appended"
+      "new remote-approver hook should be appended"
     );
   });
 
@@ -389,13 +389,13 @@ describe("registerHook", () => {
     const existingSettings = {
       hooks: {
         PermissionRequest: [
-          { type: "command", command: "node /old/agent-remote-approver/src/hook.mjs" },
+          { type: "command", command: "node /old/remote-approver/src/hook.mjs" },
         ],
       },
     };
     fs.writeFileSync(settingsPath, JSON.stringify(existingSettings, null, 2));
 
-    const newCommand = "node /new/agent-remote-approver/src/hook.mjs";
+    const newCommand = "node /new/remote-approver/src/hook.mjs";
     registerHook(settingsPath, newCommand);
 
     const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
@@ -412,67 +412,82 @@ describe("registerHook", () => {
 // getHookCommand
 // ===========================================================================
 
+describe("isGloballyInstalled", () => {
+  it("returns true when an remote-approver bin exists on the injected PATH", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "arp-path-"));
+    try {
+      fs.writeFileSync(path.join(dir, "remote-approver"), "#!/bin/sh\n", { mode: 0o755 });
+      assert.equal(isGloballyInstalled({ PATH: dir }), true);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns false when no such bin is on PATH", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "arp-path-"));
+    try {
+      assert.equal(isGloballyInstalled({ PATH: dir }), false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns false for empty/absent PATH", () => {
+    assert.equal(isGloballyInstalled({ PATH: "" }), false);
+    assert.equal(isGloballyInstalled({}), false);
+  });
+});
+
 describe("getHookCommand", () => {
   it("should be a function", () => {
     assert.equal(typeof getHookCommand, "function");
   });
 
-  it("should return a string", () => {
+  it("should end with 'hook' subcommand argument (either form)", () => {
+    assert.ok(getHookCommand({ globallyInstalled: true }).endsWith(" hook"));
+    assert.ok(getHookCommand({ globallyInstalled: false }).endsWith(" hook"));
+  });
+
+  // ---- Global install: stable command name (survives repo moves) ----
+
+  describe("when installed globally on $PATH", () => {
+    it("uses the stable 'remote-approver hook' command (no absolute path)", () => {
+      const cmd = getHookCommand({ globallyInstalled: true });
+      assert.equal(cmd, "remote-approver hook");
+    });
+
+    it("does not embed an absolute source path (so a repo move can't break it)", () => {
+      const cmd = getHookCommand({ globallyInstalled: true });
+      assert.ok(!cmd.includes("/"), `should not contain a path, got: "${cmd}"`);
+      assert.ok(!cmd.includes("cli.mjs"), `should not reference cli.mjs, got: "${cmd}"`);
+    });
+  });
+
+  // ---- Fallback: not installed globally, use absolute path to this checkout ----
+
+  describe("when NOT installed globally (dev checkout)", () => {
+    it("falls back to 'node \"<abs>/bin/cli.mjs\" hook'", () => {
+      const cmd = getHookCommand({ globallyInstalled: false });
+      assert.ok(cmd.startsWith("node "), `got: "${cmd}"`);
+      assert.ok(cmd.endsWith(" hook"), `got: "${cmd}"`);
+    });
+
+    it("wraps an absolute bin/cli.mjs path in double quotes", () => {
+      const cmd = getHookCommand({ globallyInstalled: false });
+      const hookPath = cmd.replace(/^node\s+/, "").replace(/ hook$/, "").replace(/^"|"$/g, "");
+      assert.ok(path.isAbsolute(hookPath), `should be absolute, got: "${hookPath}"`);
+      assert.ok(hookPath.endsWith(path.join("bin", "cli.mjs")), `should end with bin/cli.mjs, got: "${hookPath}"`);
+      const quoted = cmd.slice("node ".length).replace(/ hook$/, "");
+      assert.ok(quoted.startsWith('"') && quoted.endsWith('"'), `path should be quoted, got: "${quoted}"`);
+    });
+  });
+
+  // ---- Default (no arg): picks form based on real $PATH ----
+
+  it("defaults to a form ending in ' hook' based on the actual environment", () => {
     const cmd = getHookCommand();
     assert.equal(typeof cmd, "string");
-  });
-
-  it("should start with 'node '", () => {
-    const cmd = getHookCommand();
-    assert.ok(
-      cmd.startsWith("node "),
-      `Command should start with "node ", got: "${cmd}"`
-    );
-  });
-
-  it("should contain cli.mjs in the path", () => {
-    const cmd = getHookCommand();
-    assert.ok(
-      cmd.includes("cli.mjs"),
-      `Command should include "cli.mjs", got: "${cmd}"`
-    );
-  });
-
-  it("should end with 'hook' subcommand argument", () => {
-    const cmd = getHookCommand();
-    assert.ok(
-      cmd.endsWith(" hook"),
-      `Command should end with " hook", got: "${cmd}"`
-    );
-  });
-
-  it("should wrap the path in double quotes", () => {
-    const cmd = getHookCommand();
-    // After "node ", strip the trailing " hook" to isolate the quoted path
-    const quotedPath = cmd.slice("node ".length).replace(/ hook$/, "");
-    assert.ok(
-      quotedPath.startsWith('"') && quotedPath.endsWith('"'),
-      `Path should be wrapped in double quotes, got: "${quotedPath}"`
-    );
-  });
-
-  it("should contain an absolute path (starts with /)", () => {
-    const cmd = getHookCommand();
-    // Extract the path: strip "node ", trailing " hook", and surrounding quotes
-    const hookPath = cmd.replace(/^node\s+/, "").replace(/ hook$/, "").replace(/^"|"$/g, "");
-    assert.ok(
-      path.isAbsolute(hookPath),
-      `Hook path should be absolute, got: "${hookPath}"`
-    );
-  });
-
-  it("should point to bin/cli.mjs relative to the package root", () => {
-    const cmd = getHookCommand();
-    const hookPath = cmd.replace(/^node\s+/, "").replace(/ hook$/, "").replace(/^"|"$/g, "");
-    assert.ok(
-      hookPath.endsWith(path.join("bin", "cli.mjs")),
-      `Hook path should end with "bin/cli.mjs", got: "${hookPath}"`
-    );
+    assert.ok(cmd.endsWith(" hook"));
   });
 });
 
@@ -545,13 +560,13 @@ describe("unregisterHook", () => {
     );
   });
 
-  it("should remove only agent-remote-approver entries from PermissionRequest", () => {
+  it("should remove only remote-approver entries from PermissionRequest", () => {
     const settingsPath = path.join(tmpDir, "remove-cra-settings.json");
     const original = {
       hooks: {
         PermissionRequest: [
           { hooks: [{ type: "command", command: "echo other-hook" }] },
-          { hooks: [{ type: "command", command: "node /path/agent-remote-approver/src/hook.mjs" }] },
+          { hooks: [{ type: "command", command: "node /path/remote-approver/src/hook.mjs" }] },
         ],
       },
     };
@@ -568,7 +583,7 @@ describe("unregisterHook", () => {
     assert.equal(
       settings.hooks.PermissionRequest[0].hooks[0].command,
       "echo other-hook",
-      "non-agent-remote-approver entry should remain"
+      "non-remote-approver entry should remain"
     );
   });
 
@@ -579,7 +594,7 @@ describe("unregisterHook", () => {
         PreToolUse: [{ type: "command", command: "echo pre-tool" }],
         PermissionRequest: [
           { hooks: [{ type: "command", command: "echo other-hook" }] },
-          { hooks: [{ type: "command", command: "node /path/agent-remote-approver/src/hook.mjs" }] },
+          { hooks: [{ type: "command", command: "node /path/remote-approver/src/hook.mjs" }] },
         ],
       },
     };
@@ -596,12 +611,12 @@ describe("unregisterHook", () => {
     assert.equal(
       settings.hooks.PermissionRequest.length,
       1,
-      "should have only non-agent-remote-approver entry in PermissionRequest"
+      "should have only non-remote-approver entry in PermissionRequest"
     );
     assert.equal(
       settings.hooks.PermissionRequest[0].hooks[0].command,
       "echo other-hook",
-      "non-agent-remote-approver entry should remain"
+      "non-remote-approver entry should remain"
     );
   });
 
@@ -611,7 +626,7 @@ describe("unregisterHook", () => {
       hooks: {
         PreToolUse: [{ type: "command", command: "echo pre-tool" }],
         PermissionRequest: [
-          { hooks: [{ type: "command", command: "node /path/agent-remote-approver/src/hook.mjs" }] },
+          { hooks: [{ type: "command", command: "node /path/remote-approver/src/hook.mjs" }] },
         ],
       },
     };
@@ -638,7 +653,7 @@ describe("unregisterHook", () => {
       autoUpdaterStatus: "disabled",
       hooks: {
         PermissionRequest: [
-          { hooks: [{ type: "command", command: "node /path/agent-remote-approver/src/hook.mjs" }] },
+          { hooks: [{ type: "command", command: "node /path/remote-approver/src/hook.mjs" }] },
         ],
       },
     };
@@ -664,7 +679,7 @@ describe("unregisterHook", () => {
     const original = {
       hooks: {
         PermissionRequest: [
-          { type: "command", command: "node /path/agent-remote-approver/src/hook.mjs" },
+          { type: "command", command: "node /path/remote-approver/src/hook.mjs" },
         ],
       },
     };
