@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
 # deploy-ntfy.sh — deploy a private, self-hosted ntfy server on an Ubuntu EC2
-# box for use with agent-remote-approver (Android instant push, no Firebase).
+# box for use with remote-approver (Android instant push, no Firebase).
 #
 # Run this ON the EC2 instance (Ubuntu 20.04+). It:
 #   1. installs Docker + compose plugin if missing
 #   2. writes /opt/ntfy/{docker-compose.yml, server.yml} (+ Caddyfile in TLS mode)
 #   3. provisions a private (deny-all) instance with one admin user
-#   4. starts the stack and prints the exact ~/.agent-remote-approver.json snippet
+#   4. starts the stack and prints the exact ~/.config/remote-approver/config.json snippet
 #
 # Two modes (auto-selected):
 #   • HTTP-only (default)  — no domain needed. ntfy on http://<public-ip>:<PORT>.
@@ -192,7 +192,7 @@ cat <<EOF
 $( [ "$MODE" = http ]  && echo "    ⚠ HTTP mode: Basic-auth is cleartext. Restrict the SG to YOUR source IPs, not 0.0.0.0/0." )
 $( [ "$MODE" = https ] && echo "    Ensure DNS A record: $NTFY_DOMAIN -> this box's public IP (needed before the cert issues)." )
  2. Android ntfy app: add server "$BASE_URL", sign in as "$NTFY_USER", subscribe to your topic.
- 3. Point agent-remote-approver at it — write ~/.agent-remote-approver.json:
+ 3. Point remote-approver at it — write ~/.config/remote-approver/config.json:
 
     {
       "topic": "$TOPIC",
@@ -202,8 +202,8 @@ $( [ "$MODE" = https ] && echo "    Ensure DNS A record: $NTFY_DOMAIN -> this bo
       "notifyOnStop": true
     }
 
-    …then run:  agent-remote-approver setup   (keeps this ntfyServer; regenerates topic)
-    or keep the topic above and just run:      agent-remote-approver test
+    …then run:  remote-approver setup   (keeps this ntfyServer; regenerates topic)
+    or keep the topic above and just run:      remote-approver test
 
  Teardown:  cd $NTFY_DIR && $SUDO docker compose down    (add -v to also delete data)
 ────────────────────────────────────────────────────────────

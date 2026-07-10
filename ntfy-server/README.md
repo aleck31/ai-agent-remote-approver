@@ -1,8 +1,7 @@
-# Deploying ntfy for agent-remote-approver
+# Deploying ntfy for ai-agent-remote-approver
 
-Guidance for standing up the ntfy server that `agent-remote-approver` publishes
-to. Targeted at **Android** (ntfy app uses a WebSocket "instant delivery"
-connection — no Firebase/APNs needed).
+Guidance for standing up the ntfy server that `remote-approver` publishes to. 
+Targeted at **Android** (ntfy app uses a WebSocket "instant delivery" connection — no Firebase/APNs needed).
 
 ## Pick a method
 
@@ -14,10 +13,10 @@ connection — no Firebase/APNs needed).
 | **HTTP-only** (`deploy-ntfy.sh`) | `NTFY_PORT` | ❌ cleartext | Docker | trusted LAN / quick test only |
 
 **Rule of thumb:** self-hosting + don't want to expose EC2 → **Cloudflare Tunnel**.
-No domain, just want it working → **public ntfy.sh** (`agent-remote-approver setup`).
+No domain, just want it working → **public ntfy.sh** (`remote-approver setup`).
 
 All self-host scripts create a **private** instance (`auth-default-access: deny-all`)
-with one admin user, and print the exact `~/.agent-remote-approver.json` snippet.
+with one admin user, and print the exact `~/.config/remote-approver/config.json` snippet.
 
 ---
 
@@ -52,7 +51,7 @@ NTFY_DOMAIN=ntfy.example.com NTFY_TUNNEL=ntfy NTFY_USER=phil ./deploy-ntfy-cloud
 Remotely (scp + ssh):
 
 ```bash
-scp -i ~/.ssh/key.pem deploy/deploy-ntfy-cloudflared.sh ubuntu@HOST:/tmp/
+scp -i ~/.ssh/key.pem ntfy-server/deploy-ntfy-cloudflared.sh ubuntu@HOST:/tmp/
 ssh -i ~/.ssh/key.pem ubuntu@HOST \
   'NTFY_DOMAIN=ntfy.example.com NTFY_TUNNEL=ntfy bash /tmp/deploy-ntfy-cloudflared.sh'
 ```
@@ -121,9 +120,9 @@ Manage (compose-based): `cd /opt/ntfy && sudo docker compose {logs -f,restart,do
 
 1. **Phone (Android):** subscribe in the ntfy app — see below.
 2. **Each machine running Claude Code** (local + EC2s): put this in
-   `~/.agent-remote-approver.json`, then run `agent-remote-approver setup` (it
+   `~/.config/remote-approver/config.json`, then run `remote-approver setup` (it
    preserves `ntfyServer`, regenerates the topic, registers the hooks) and
-   `agent-remote-approver test`:
+   `remote-approver test`:
 
    ```json
    {
@@ -148,7 +147,7 @@ Because the server is **private (`deny-all`)**, you **must enter the username/pa
    - Username: `phil`
    - Password: your password
 3. **Subscribe to the topic:** tap **+** → enter your `cra-…` topic → tap **Use another server** and enter `https://ntfy.example.com` → **Subscribe**. The app uses the credentials you added for that server automatically.
-4. Send a test from any machine (`agent-remote-approver test`) or via curl:
+4. Send a test from any machine (`remote-approver test`) or via curl:
    ```bash
    curl -u 'phil:<password>' -d "hello from ntfy" https://ntfy.example.com/<your-topic>
    ```

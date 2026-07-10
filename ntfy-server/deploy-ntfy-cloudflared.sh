@@ -149,7 +149,7 @@ cat <<EOF
  ntfy bind  : 127.0.0.1:$NTFY_PORT   (localhost only)
 
  On the phone: ntfy app -> add server "https://$NTFY_DOMAIN", sign in, subscribe.
- Approver: put this in ~/.agent-remote-approver.json on each machine:
+ Approver: put this in ~/.config/remote-approver/config.json on each machine:
    {
      "topic": "cra-<32hex>",
      "ntfyServer": "https://$NTFY_DOMAIN",
