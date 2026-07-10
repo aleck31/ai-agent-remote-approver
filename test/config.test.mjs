@@ -21,8 +21,6 @@ import os from "node:os";
 import path from "node:path";
 import {
   CONFIG_PATH,
-  LEGACY_CONFIG_PATHS,
-  resolveConfigPath,
   DEFAULT_CONFIG,
   loadConfig,
   saveConfig,
@@ -33,11 +31,11 @@ import {
 // ==================== CONFIG_PATH ====================
 
 describe("CONFIG_PATH", () => {
-  it("should be a string ending with agent-remote-approver/config.json (XDG)", () => {
+  it("should end with remote-approver/config.json (XDG)", () => {
     assert.equal(typeof CONFIG_PATH, "string");
     assert.ok(
-      CONFIG_PATH.endsWith(path.join("agent-remote-approver", "config.json")),
-      `CONFIG_PATH should end with agent-remote-approver/config.json, got: ${CONFIG_PATH}`
+      CONFIG_PATH.endsWith(path.join("remote-approver", "config.json")),
+      `CONFIG_PATH should end with remote-approver/config.json, got: ${CONFIG_PATH}`
     );
   });
 
@@ -45,34 +43,9 @@ describe("CONFIG_PATH", () => {
     const base = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
     assert.equal(
       CONFIG_PATH,
-      path.join(base, "agent-remote-approver", "config.json"),
+      path.join(base, "remote-approver", "config.json"),
       `CONFIG_PATH should be under the XDG config dir, got: ${CONFIG_PATH}`
     );
-  });
-});
-
-// ==================== resolveConfigPath (XDG + legacy fallback) ====================
-
-describe("resolveConfigPath", () => {
-  it("lists the legacy $HOME dotfile as a fallback (for pre-XDG installs)", () => {
-    assert.ok(Array.isArray(LEGACY_CONFIG_PATHS) && LEGACY_CONFIG_PATHS.length >= 1);
-    assert.ok(
-      LEGACY_CONFIG_PATHS.includes(path.join(os.homedir(), ".agent-remote-approver.json")),
-      `legacy list should include the old dotfile, got: ${JSON.stringify(LEGACY_CONFIG_PATHS)}`
-    );
-  });
-
-  it("returns an existing path, preferring XDG, else a legacy file, else XDG", () => {
-    const chosen = resolveConfigPath();
-    const candidates = [CONFIG_PATH, ...LEGACY_CONFIG_PATHS];
-    assert.ok(candidates.includes(chosen), `chosen path must be one of the known candidates, got: ${chosen}`);
-    // If XDG exists it must win; otherwise the choice must be an existing legacy file or the XDG default.
-    if (fs.existsSync(CONFIG_PATH)) {
-      assert.equal(chosen, CONFIG_PATH, "XDG path must win when it exists");
-    } else {
-      const existingLegacy = LEGACY_CONFIG_PATHS.find((p) => fs.existsSync(p));
-      assert.equal(chosen, existingLegacy ?? CONFIG_PATH);
-    }
   });
 });
 
@@ -129,7 +102,7 @@ describe("loadConfig", () => {
 
   before(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cra-test-"));
-    tmpConfigPath = path.join(tmpDir, ".agent-remote-approver.json");
+    tmpConfigPath = path.join(tmpDir, ".remote-approver.json");
   });
 
   after(() => {
@@ -275,7 +248,7 @@ describe("saveConfig", () => {
 
   before(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cra-test-"));
-    tmpConfigPath = path.join(tmpDir, ".agent-remote-approver.json");
+    tmpConfigPath = path.join(tmpDir, ".remote-approver.json");
   });
 
   after(() => {

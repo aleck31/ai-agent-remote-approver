@@ -3,25 +3,9 @@ import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
 
-// XDG Base Directory: ~/.config/agent-remote-approver/config.json (honoring
-// $XDG_CONFIG_HOME). Legacy dotfiles in $HOME are still read for back-compat.
+// XDG Base Directory: ~/.config/remote-approver/config.json (honoring $XDG_CONFIG_HOME).
 const XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
-export const CONFIG_PATH = path.join(XDG_CONFIG_HOME, "agent-remote-approver", "config.json");
-
-// Older location, tried only when the XDG path is absent (pre-XDG installs put
-// the config as a dotfile in $HOME).
-export const LEGACY_CONFIG_PATHS = [
-  path.join(os.homedir(), ".agent-remote-approver.json"),
-];
-
-/** First existing config path: XDG if present, else the first legacy file that exists, else XDG. */
-export function resolveConfigPath() {
-  if (fs.existsSync(CONFIG_PATH)) return CONFIG_PATH;
-  for (const p of LEGACY_CONFIG_PATHS) {
-    if (fs.existsSync(p)) return p;
-  }
-  return CONFIG_PATH;
-}
+export const CONFIG_PATH = path.join(XDG_CONFIG_HOME, "remote-approver", "config.json");
 
 export const DEFAULT_CONFIG = {
   topic: "",
@@ -37,7 +21,7 @@ export const DEFAULT_CONFIG = {
   notifyOnStop: false,
 };
 
-export function loadConfig(configPath = resolveConfigPath()) {
+export function loadConfig(configPath = CONFIG_PATH) {
   try {
     const raw = fs.readFileSync(configPath, "utf-8");
     const fileConfig = JSON.parse(raw);
