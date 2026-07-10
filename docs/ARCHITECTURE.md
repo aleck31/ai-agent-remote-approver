@@ -27,11 +27,11 @@ Claude Code ──spawn──▶ node bin/cli.mjs hook          (per event, stdi
 
 | File | Responsibility |
 |---|---|
-| `bin/cli.mjs` | CLI entry: `setup/test[ --wait]/status/enable/disable/uninstall/hook`. Reads stdin, calls the adapter's `processHook`, writes decision to stdout. Wires deps (incl. `updateNotification = sendNotification`). `test --wait` does a full round-trip check (publish an Ack button, block on `waitForResponse`). |
+| `bin/cli.mjs` | CLI entry: `init/enable/disable/test[ --wait]/status/uninstall/hook`. Reads stdin, calls the adapter's `processHook`, writes decision to stdout. Wires deps (incl. `updateNotification = sendNotification`). `test --wait` does a full round-trip check (publish an Ack button, block on `waitForResponse`). |
 | `src/adapters/claude-code.mjs` | Claude Code adapter: `processHook`, `processAskUserQuestion`, `processStop`, `buildActions`, `sendWithRetry`, `sendResolved`, `ASK`/`DENY` constants. Translates the CC hook contract to the shared ntfy core. |
 | `src/ntfy.mjs` | Agent-agnostic ntfy core: `sendNotification`, `waitForResponse` (SSE), `formatToolInfo`/`formatToolPreview`, `sessionTag`, `formatStopNotification`, `stripMarkdown`, `PRIORITY`. |
 | `src/config.mjs` | Load/validate/save config (XDG path + legacy fallback); `generateTopic`; `resolveAuth`. |
-| `src/setup.mjs` | Register/unregister hooks in settings.json (`PermissionRequest` + `Stop`); `getHookCommand` (stable global command, else absolute-path fallback); `runSetup`. |
+| `src/hooks.mjs` | Register/unregister hooks in settings.json (`PermissionRequest` + `Stop`); `getHookCommand` (stable global command, else absolute-path fallback); `runInit` (config-only, no hook). |
 | `test/*.test.mjs` | Node built-in test runner; shared mocks in `test/helpers.mjs`. |
 
 ## PermissionRequest lifecycle (`processHook`)
@@ -74,5 +74,5 @@ is purely cosmetic (tell them apart on the phone).
 
 - New per-tool preview: add a case in `formatToolPreview` (`src/ntfy.mjs`).
 - New resolved-outcome label: add to the `RESOLVED` map (`src/adapters/claude-code.mjs`).
-- New hook event: branch in `processHook` and register it in `src/setup.mjs`.
+- New hook event: branch in `processHook` and register it in `src/hooks.mjs`.
 - New agent: add `src/adapters/<agent>.mjs` translating its hook contract to the ntfy core.

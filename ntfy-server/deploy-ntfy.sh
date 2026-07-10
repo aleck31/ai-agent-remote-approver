@@ -202,7 +202,7 @@ $( [ "$MODE" = https ] && echo "    Ensure DNS A record: $NTFY_DOMAIN -> this bo
       "notifyOnStop": true
     }
 
-    …then run:  remote-approver setup   (keeps this ntfyServer; regenerates topic)
+    …then run:  remote-approver init   (keeps this ntfyServer; regenerates topic; then: enable)
     or keep the topic above and just run:      remote-approver test
 
  Teardown:  cd $NTFY_DIR && $SUDO docker compose down    (add -v to also delete data)

@@ -1,8 +1,8 @@
 /**
- * Test module for src/setup.mjs
+ * Test module for src/hooks.mjs
  *
  * Coverage:
- * - runSetup: generates topic, saves config, registers hook, returns result
+ * - runInit: generates topic, saves config, returns result (no hook registration)
  * - registerHook: creates settings.json, preserves existing settings/hooks,
  *   sets correct PermissionRequest hook structure
  * - getHookCommand: returns valid command string containing cli.mjs hook
@@ -15,19 +15,19 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { runSetup, registerHook, getHookCommand, unregisterHook, isGloballyInstalled } from "../src/setup.mjs";
+import { runInit, registerHook, getHookCommand, unregisterHook, isGloballyInstalled } from "../src/hooks.mjs";
 
 // ===========================================================================
-// runSetup
+// runInit
 // ===========================================================================
 
-describe("runSetup", () => {
+describe("runInit", () => {
   let tmpDir;
   let tmpConfigPath;
   let tmpSettingsPath;
 
   before(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cra-setup-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cra-init-test-"));
     tmpConfigPath = path.join(tmpDir, ".remote-approver.json");
     tmpSettingsPath = path.join(tmpDir, "settings.json");
   });
@@ -37,14 +37,14 @@ describe("runSetup", () => {
   });
 
   it("should be a function", () => {
-    assert.equal(typeof runSetup, "function");
+    assert.equal(typeof runInit, "function");
   });
 
   it("should generate a topic via the injected generateTopic", async () => {
     const generatedTopic = "cra-test1234abcd";
     let saveConfigCalledWith = null;
 
-    const result = await runSetup({
+    const result = await runInit({
       configPath: tmpConfigPath,
       settingsPath: tmpSettingsPath,
       generateTopic: () => generatedTopic,
@@ -62,7 +62,7 @@ describe("runSetup", () => {
     let savedConfig = null;
     let savedPath = null;
 
-    await runSetup({
+    await runInit({
       configPath: tmpConfigPath,
       settingsPath: tmpSettingsPath,
       generateTopic: () => generatedTopic,
@@ -78,59 +78,25 @@ describe("runSetup", () => {
     assert.equal(savedPath, tmpConfigPath);
   });
 
-  it("should register the hook in settings.json at settingsPath", async () => {
-    // Clean up settings file before test
-    if (fs.existsSync(tmpSettingsPath)) {
-      fs.unlinkSync(tmpSettingsPath);
-    }
+  it("should NOT register any hook (that is enable's job)", async () => {
+    if (fs.existsSync(tmpSettingsPath)) fs.unlinkSync(tmpSettingsPath);
 
-    await runSetup({
+    await runInit({
       configPath: tmpConfigPath,
-      settingsPath: tmpSettingsPath,
-      generateTopic: () => "cra-hookregtest1",
+      generateTopic: () => "cra-nohookreg1",
       saveConfig: () => {},
       loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, autoApprove: [], autoDeny: [] }),
     });
 
-    // settings.json should exist after setup
-    assert.ok(fs.existsSync(tmpSettingsPath), "settings.json should have been created");
-
-    const settings = JSON.parse(fs.readFileSync(tmpSettingsPath, "utf-8"));
-    assert.ok(settings.hooks, "settings should have a hooks property");
-    assert.ok(
-      settings.hooks.PermissionRequest,
-      "hooks should have a PermissionRequest property"
-    );
-    assert.ok(
-      Array.isArray(settings.hooks.PermissionRequest),
-      "PermissionRequest should be an array"
-    );
-    assert.equal(settings.hooks.PermissionRequest.length, 1);
-    assert.ok(
-      Array.isArray(settings.hooks.PermissionRequest[0].hooks),
-      "entry should have a hooks array"
-    );
-    assert.equal(settings.hooks.PermissionRequest[0].hooks[0].type, "command");
-    assert.ok(
-      settings.hooks.PermissionRequest[0].hooks[0].command.includes("cli.mjs"),
-      `hook command should include "cli.mjs", got: "${settings.hooks.PermissionRequest[0].hooks[0].command}"`
-    );
-
-    // Stop hook is registered too (behavior gated by config.notifyOnStop)
-    assert.ok(Array.isArray(settings.hooks.Stop), "hooks should have a Stop array");
-    assert.equal(settings.hooks.Stop.length, 1);
-    assert.ok(
-      settings.hooks.Stop[0].hooks[0].command.includes("cli.mjs"),
-      `Stop hook command should include "cli.mjs", got: "${settings.hooks.Stop[0].hooks[0].command}"`
-    );
+    // runInit only writes config; it must not touch settings.json.
+    assert.ok(!fs.existsSync(tmpSettingsPath), "runInit must not create/register hooks in settings.json");
   });
 
-  it("should return an object with topic, configPath, and settingsPath", async () => {
+  it("should return an object with topic and configPath (no hook registration)", async () => {
     const generatedTopic = "cra-returntest12";
 
-    const result = await runSetup({
+    const result = await runInit({
       configPath: tmpConfigPath,
-      settingsPath: tmpSettingsPath,
       generateTopic: () => generatedTopic,
       saveConfig: () => {},
       loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, autoApprove: [], autoDeny: [] }),
@@ -139,11 +105,10 @@ describe("runSetup", () => {
     assert.equal(typeof result, "object");
     assert.equal(result.topic, generatedTopic);
     assert.equal(result.configPath, tmpConfigPath);
-    assert.equal(result.settingsPath, tmpSettingsPath);
   });
 
   it("should return ntfyServer from the loaded config", async () => {
-    const result = await runSetup({
+    const result = await runInit({
       configPath: tmpConfigPath,
       settingsPath: tmpSettingsPath,
       generateTopic: () => "cra-ntfyservertest",
@@ -155,7 +120,7 @@ describe("runSetup", () => {
   });
 
   // =========================================================================
-  // Auth prompt during setup (TDD Red phase — runSetup doesn't accept prompt yet)
+  // Auth prompt during init (TDD Red phase — runInit doesn't accept prompt yet)
   // =========================================================================
 
   it("should prompt for auth and save credentials when user answers 'y'", async () => {
@@ -163,7 +128,7 @@ describe("runSetup", () => {
     const promptResponses = ["y", "myuser", "mypass"];
     let promptIdx = 0;
 
-    const result = await runSetup({
+    const result = await runInit({
       configPath: tmpConfigPath,
       settingsPath: tmpSettingsPath,
       generateTopic: () => "cra-authtest1",
@@ -180,7 +145,7 @@ describe("runSetup", () => {
   it("should skip auth when user answers 'n'", async () => {
     let savedConfig = null;
 
-    const result = await runSetup({
+    const result = await runInit({
       configPath: tmpConfigPath,
       settingsPath: tmpSettingsPath,
       generateTopic: () => "cra-authtest2",
@@ -197,7 +162,7 @@ describe("runSetup", () => {
   it("should skip auth when user presses Enter (empty response)", async () => {
     let savedConfig = null;
 
-    const result = await runSetup({
+    const result = await runInit({
       configPath: tmpConfigPath,
       settingsPath: tmpSettingsPath,
       generateTopic: () => "cra-authtest3",

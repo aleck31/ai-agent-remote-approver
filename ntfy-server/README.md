@@ -13,7 +13,7 @@ Targeted at **Android** (ntfy app uses a WebSocket "instant delivery" connection
 | **HTTP-only** (`deploy-ntfy.sh`) | `NTFY_PORT` | ❌ cleartext | Docker | trusted LAN / quick test only |
 
 **Rule of thumb:** self-hosting + don't want to expose EC2 → **Cloudflare Tunnel**.
-No domain, just want it working → **public ntfy.sh** (`remote-approver setup`).
+No domain, just want it working → **public ntfy.sh** (`remote-approver init`).
 
 All self-host scripts create a **private** instance (`auth-default-access: deny-all`)
 with one admin user, and print the exact `~/.config/remote-approver/config.json` snippet.
@@ -120,7 +120,7 @@ Manage (compose-based): `cd /opt/ntfy && sudo docker compose {logs -f,restart,do
 
 1. **Phone (Android):** subscribe in the ntfy app — see below.
 2. **Each machine running Claude Code** (local + EC2s): put this in
-   `~/.config/remote-approver/config.json`, then run `remote-approver setup` (it
+   `~/.config/remote-approver/config.json`, then run `remote-approver init` (it
    preserves `ntfyServer`, regenerates the topic, registers the hooks) and
    `remote-approver test`:
 
@@ -134,8 +134,8 @@ Manage (compose-based): `cd /opt/ntfy && sudo docker compose {logs -f,restart,do
    }
    ```
 
-   Note: `setup` does **not** prompt for `ntfyServer` — pre-write it (or edit the
-   file after), then run setup.
+   Note: `init` does **not** prompt for `ntfyServer` — pre-write it (or edit the
+   file after), then run init.
 
 ## Subscribe on your phone (Android)
 

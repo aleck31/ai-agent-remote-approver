@@ -2,7 +2,7 @@
  * Test suite for bin/cli.mjs
  *
  * Coverage:
- * - main(['setup'], deps) — calls runSetup with correct params
+ * - main(['init'], deps) — calls runInit with correct params
  * - main(['test'], deps) — loads config, sends test notification
  * - main(['test'], deps) — reports error when no topic configured
  * - main(['status'], deps) — loads config, writes settings to stdout
@@ -90,9 +90,9 @@ function createDeps(overrides = {}) {
           hookSpecificOutput: { hookEventName: "PermissionRequest", decision: { behavior: "allow" } },
         },
     ),
-    runSetup: mock.fn(
+    runInit: mock.fn(
       async () =>
-        overrides.setupResult ?? {
+        overrides.initResult ?? {
           topic: "cra-generated123",
           ntfyServer: "https://ntfy.sh",
           configPath: "/home/user/.remote-approver.json",
@@ -119,27 +119,27 @@ describe("main", () => {
   });
 
   // =========================================================================
-  // setup subcommand
+  // init subcommand
   // =========================================================================
 
-  describe("setup subcommand", () => {
-    it("should call runSetup when args is ['setup']", async () => {
+  describe("init subcommand", () => {
+    it("should call runInit when args is ['init']", async () => {
       const deps = createDeps();
 
-      await main(["setup"], deps);
+      await main(["init"], deps);
 
       assert.equal(
-        deps.runSetup.mock.callCount(),
+        deps.runInit.mock.callCount(),
         1,
-        "runSetup should be called exactly once",
+        "runInit should be called exactly once",
       );
     });
 
-    it("should write the generated topic to stdout after setup", async () => {
+    it("should write the generated topic to stdout after init", async () => {
       const stdout = createMockWriter();
       const deps = createDeps({ stdout });
 
-      await main(["setup"], deps);
+      await main(["init"], deps);
 
       const output = stdout.output();
       assert.ok(
@@ -150,7 +150,7 @@ describe("main", () => {
 
     it("should call generateQR with ntfy:// URL containing the topic", async () => {
       const deps = createDeps();
-      await main(["setup"], deps);
+      await main(["init"], deps);
 
       assert.equal(deps.generateQR.mock.callCount(), 1, "generateQR should be called exactly once");
       const [text] = deps.generateQR.mock.calls[0].arguments;
@@ -163,7 +163,7 @@ describe("main", () => {
         stdout,
         generateQR: mock.fn((text, opts, cb) => cb("FAKE_QR_OUTPUT")),
       });
-      await main(["setup"], deps);
+      await main(["init"], deps);
 
       const output = stdout.output();
       assert.ok(output.includes("FAKE_QR_OUTPUT"), `stdout should contain QR output, got: ${output}`);
@@ -172,7 +172,7 @@ describe("main", () => {
     it("should write https:// subscribe URL to stdout", async () => {
       const stdout = createMockWriter();
       const deps = createDeps({ stdout });
-      await main(["setup"], deps);
+      await main(["init"], deps);
 
       const output = stdout.output();
       assert.ok(
@@ -185,14 +185,14 @@ describe("main", () => {
       const stdout = createMockWriter();
       const deps = createDeps({
         stdout,
-        setupResult: {
+        initResult: {
           topic: "cra-custom123",
           ntfyServer: "https://ntfy.example.com",
           configPath: "/home/user/.remote-approver.json",
           settingsPath: "/home/user/.claude/settings.json",
         },
       });
-      await main(["setup"], deps);
+      await main(["init"], deps);
 
       assert.equal(deps.generateQR.mock.callCount(), 1);
       const [text] = deps.generateQR.mock.calls[0].arguments;
@@ -209,14 +209,14 @@ describe("main", () => {
       const stdout = createMockWriter();
       const deps = createDeps({
         stdout,
-        setupResult: {
+        initResult: {
           topic: "cra-selfhost123",
           ntfyServer: "http://192.168.1.100:8080",
           configPath: "/home/user/.remote-approver.json",
           settingsPath: "/home/user/.claude/settings.json",
         },
       });
-      await main(["setup"], deps);
+      await main(["init"], deps);
 
       assert.equal(deps.generateQR.mock.callCount(), 1);
       const [text] = deps.generateQR.mock.calls[0].arguments;
@@ -235,7 +235,7 @@ describe("main", () => {
       const deps = createDeps({
         stdout,
         stderr,
-        setupResult: {
+        initResult: {
           topic: "cra-invalidurl123",
           ntfyServer: "not-a-valid-url",
           configPath: "/home/user/.remote-approver.json",
@@ -245,7 +245,7 @@ describe("main", () => {
 
       // Should not throw
       await assert.doesNotReject(async () => {
-        await main(["setup"], deps);
+        await main(["init"], deps);
       });
 
       const errOutput = stderr.output();
@@ -942,8 +942,8 @@ describe("main", () => {
         `stdout should contain usage text, got: ${output}`,
       );
       assert.ok(
-        output.includes("setup"),
-        `stdout should mention setup command, got: ${output}`,
+        output.includes("init"),
+        `stdout should mention init command, got: ${output}`,
       );
       assert.equal(
         deps.exit.mock.callCount(),

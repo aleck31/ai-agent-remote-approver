@@ -3,7 +3,7 @@
 /**
  * CLI entry point for remote-approver.
  *
- * Subcommands: setup | test | status | enable | disable | uninstall | hook
+ * Subcommands: init | enable | disable | test | status | uninstall | hook
  * All I/O goes through the injected `deps` object so the module is fully testable.
  */
 
@@ -15,7 +15,7 @@ import qrcode from "qrcode-terminal";
 import { ASK } from "../src/adapters/claude-code.mjs";
 
 const USAGE =
-  "Usage: remote-approver <command>\n\nCommands:\n  setup       Set up remote approval\n  test        Send a test notification (add --wait to verify the round trip)\n  status      Show current configuration\n  enable      Re-enable the hook\n  disable     Temporarily disable the hook\n  uninstall   Remove hook and delete configuration\n  hook        Process a Claude Code hook (internal)\n";
+  "Usage: remote-approver <command>\n\nCommands:\n  init        Generate a topic and write config (no hook)\n  enable      Register the hooks\n  disable     Remove the hooks (keeps config)\n  test        Send a test notification (add --wait to verify the round trip)\n  status      Show current configuration\n  uninstall   Remove hooks and delete configuration\n  hook        Process a Claude Code hook (internal)\n";
 
 // ---------------------------------------------------------------------------
 // main
@@ -34,9 +34,9 @@ export async function main(args, deps) {
   const command = args[0];
 
   switch (command) {
-    case "setup": {
-      const result = await deps.runSetup(deps);
-      deps.stdout.write(`Setup complete. Topic: ${result.topic}\n\n`);
+    case "init": {
+      const result = await deps.runInit(deps);
+      deps.stdout.write(`Config initialized. Topic: ${result.topic}\n\n`);
 
       try {
         const serverUrl = new URL(result.ntfyServer);
@@ -56,13 +56,15 @@ export async function main(args, deps) {
         deps.stderr.write(`Warning: Invalid ntfyServer URL in config: ${result.ntfyServer}\n`);
         deps.stdout.write(`Subscribe to topic "${result.topic}" in the ntfy app.\n`);
       }
+
+      deps.stdout.write("\nNext: run 'remote-approver enable' to register the hooks.\n");
       break;
     }
 
     case "test": {
       const config = deps.loadConfig();
       if (!config.topic) {
-        deps.stderr.write("Error: No topic configured. Run 'remote-approver setup' first.\n");
+        deps.stderr.write("Error: No topic configured. Run 'remote-approver init' first.\n");
         break;
       }
       const auth = deps.resolveAuth(config);
@@ -98,7 +100,7 @@ export async function main(args, deps) {
             }),
           });
           if (response?.answer || response?.approved) {
-            deps.stdout.write("Round-trip OK — the Ack reached this machine. Setup is working.\n");
+            deps.stdout.write("Round-trip OK — the Ack reached this machine.\n");
           } else {
             deps.stdout.write(`No Ack received (${response?.timeout ? "timed out" : "no response"}). The push may not have reached your phone, or you didn't tap Ack.\n`);
           }
@@ -113,7 +115,7 @@ export async function main(args, deps) {
           server: config.ntfyServer,
           topic: config.topic,
           title: "Claude Remote Approver",
-          message: "Test notification - if you see this, setup is working!",
+          message: "Test notification — if you see this, it works!",
           actions: [],
           requestId: "test",
           auth,
@@ -198,7 +200,7 @@ export async function main(args, deps) {
     case "enable": {
       const config = deps.loadConfig();
       if (!config.topic) {
-        deps.stderr.write("Error: No topic configured. Run 'remote-approver setup' first.\n");
+        deps.stderr.write("Error: No topic configured. Run 'remote-approver init' first.\n");
         deps.exit(1);
         break;
       }
@@ -247,7 +249,7 @@ if (isMain) {
   );
   const { randomUUID } = await import("node:crypto");
   const { processHook } = await import("../src/adapters/claude-code.mjs");
-  const { runSetup, registerHook, getHookCommand, unregisterHook, registerStopHook, unregisterStopHook } = await import("../src/setup.mjs");
+  const { runInit, registerHook, getHookCommand, unregisterHook, registerStopHook, unregisterStopHook } = await import("../src/hooks.mjs");
 
   const args = process.argv.slice(2);
 
@@ -272,7 +274,7 @@ if (isMain) {
     buildAuthHeader,
     randomUUID,
     processHook,
-    runSetup,
+    runInit,
     registerHook,
     getHookCommand,
     unregisterHook,

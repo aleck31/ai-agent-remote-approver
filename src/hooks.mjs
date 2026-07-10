@@ -149,15 +149,16 @@ export function unregisterStopHook(settingsPath) {
 }
 
 /**
- * Runs the full setup flow:
+ * Runs first-time configuration only (no hook registration):
  * 1. Generate a topic
- * 2. Build and save config
- * 3. Register the hook in settings.json
- * 4. Return { topic, configPath, settingsPath }
+ * 2. Optionally prompt for auth
+ * 3. Save the config
+ * Hook registration is a separate concern — run `enable` after this.
+ *
+ * @returns {{ topic, ntfyServer, configPath }}
  */
-export async function runSetup({
+export async function runInit({
   configPath,
-  settingsPath,
   generateTopic,
   saveConfig,
   loadConfig,
@@ -180,11 +181,5 @@ export async function runSetup({
 
   saveConfig(config, configPath);
 
-  const hookCommand = getHookCommand();
-  registerHook(settingsPath, hookCommand);
-  // Register the Stop hook too; it no-ops unless config.notifyOnStop is true,
-  // so completion notifications can be toggled by editing the config alone.
-  registerStopHook(settingsPath, hookCommand);
-
-  return { topic, ntfyServer: config.ntfyServer, configPath, settingsPath };
+  return { topic, ntfyServer: config.ntfyServer, configPath };
 }
