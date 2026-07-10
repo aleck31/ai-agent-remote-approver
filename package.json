@@ -1,0 +1,37 @@
+{
+  "name": "agent-remote-approver",
+  "version": "1.0.0",
+  "description": "Approve/deny AI coding agent permission prompts from your phone via ntfy — serverless SSE callback, rich per-tool previews, resolve-in-place, completion notifications, self-hosted ntfy + Basic auth. Works with Claude Code today; other agents (e.g. kiro-cli) via adapters. Merges claude-remote-approver's architecture with claude-ntfy-hook's rich formatting.",
+  "type": "module",
+  "bin": {
+    "agent-remote-approver": "./bin/cli.mjs"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "deploy/",
+    "docs/",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "remote",
+    "approval",
+    "ntfy",
+    "notification",
+    "hook"
+  ],
+  "author": "local fork (based on claude-remote-approver by Yuuichi Eguchi + rich formatting from claude-ntfy-hook by nickknissen)",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "qrcode-terminal": "0.12.0"
+  }
+}
