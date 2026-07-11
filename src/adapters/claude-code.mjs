@@ -325,6 +325,12 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
     return ASK;
   }
 
+  // Master switch: when disabled, keep permission prompts in the terminal —
+  // don't publish or wait on the phone, just fall back to the native CLI prompt.
+  if (config.notify === false) {
+    return ASK;
+  }
+
   const auth = resolveAuth ? resolveAuth(config) : null;
 
   if (isAskUserQuestion(input)) {

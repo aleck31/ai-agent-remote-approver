@@ -54,13 +54,21 @@ Config lives at `~/.config/remote-approver/config.json`:
 {
   "topic": "cra-<random-hex>",
   "ntfyServer": "https://ntfy.sh",
-  "timeout": 120,
+  "notify": true,
+  "timeout": 15,
   "planTimeout": 300,
   "ntfyUsername": "",
   "ntfyPassword": "",
   "notifyOnStop": false
 }
 ```
+
+### Terminal vs. phone
+
+The permission prompt is a **blocking** hook: while it waits for your phone, the terminal can't show its own prompt. Two settings keep this from hijacking you when you're at the keyboard:
+
+- **`notify`** (default `true`) — set to `false` to skip the phone entirely: prompts stay in the terminal, nothing is published, no waiting. Flip it back to `true` when you step away. No re-`enable` needed.
+- **`timeout`** (default `15`s) — how long to wait for a phone tap before falling back to the terminal prompt. Short by design so a missed phone tap doesn't stall you at the terminal; raise it if you're usually away.
 
 ### Completion notifications (opt-in)
 
@@ -74,7 +82,8 @@ Set `"notifyOnStop": true` to get a one-shot push when Claude finishes a turn �
 |---|---|---|
 | `topic` | *(generated)* | ntfy topic to publish to; responses ride `{topic}-response`. 128-bit random `cra-<32hex>` — unguessable. |
 | `ntfyServer` | `https://ntfy.sh` | ntfy base URL. Point at your self-hosted instance. `init` does **not** prompt for this — pre-write it or edit after. |
-| `timeout` | `120` | Seconds to wait for a phone tap before falling back to the CLI prompt. |
+| `notify` | `true` | Master switch. `false` → keep prompts in the terminal: don't publish or wait on the phone. |
+| `timeout` | `15` | Seconds to wait for a phone tap before falling back to the CLI prompt. Short so terminal use isn't hijacked. |
 | `planTimeout` | `300` | Longer timeout for `ExitPlanMode` (plan review). |
 | `ntfyUsername` / `ntfyPassword` | `""` | Basic-auth for a private (`deny-all`) server. Env `NTFY_USERNAME` / `NTFY_PASSWORD` override the file. |
 | `notifyOnStop` | `false` | Send the one-shot "finished" push on `Stop`. |

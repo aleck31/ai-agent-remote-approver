@@ -66,8 +66,12 @@ describe("DEFAULT_CONFIG", () => {
     assert.equal(DEFAULT_CONFIG.ntfyServer, "https://ntfy.sh");
   });
 
-  it("should have timeout as 120", () => {
-    assert.equal(DEFAULT_CONFIG.timeout, 120);
+  it("should have a short default timeout (15s) so terminal use isn't hijacked", () => {
+    assert.equal(DEFAULT_CONFIG.timeout, 15);
+  });
+
+  it("should default notify to true (phone notifications on)", () => {
+    assert.equal(DEFAULT_CONFIG.notify, true);
   });
 
   it("should have autoApprove as an empty array", () => {
@@ -121,8 +125,9 @@ describe("loadConfig", () => {
     assert.deepEqual(config, {
       topic: "",
       ntfyServer: "https://ntfy.sh",
-      timeout: 120,
+      timeout: 15,
       planTimeout: 300,
+      notify: true,
       autoApprove: [],
       autoDeny: [],
       ntfyUsername: "",
@@ -153,6 +158,7 @@ describe("loadConfig", () => {
       ntfyServer: "https://custom.ntfy.example.com",
       timeout: 300,
       planTimeout: 600,
+      notify: true,
       autoApprove: ["Bash(*)"],
       autoDeny: ["mcp__*"],
       ntfyUsername: "",
@@ -291,6 +297,7 @@ describe("saveConfig", () => {
       ntfyServer: "https://custom.example.com",
       timeout: 90,
       planTimeout: 180,
+      notify: true,
       autoApprove: ["Read"],
       autoDeny: ["Bash(rm*)"],
       ntfyUsername: "",

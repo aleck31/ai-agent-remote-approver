@@ -10,8 +10,13 @@ export const CONFIG_PATH = path.join(XDG_CONFIG_HOME, "remote-approver", "config
 export const DEFAULT_CONFIG = {
   topic: "",
   ntfyServer: "https://ntfy.sh",
-  timeout: 120,
+  // Short by design: when you're AT the terminal, don't get hijacked — if the
+  // phone doesn't answer in a few seconds, fall back to the native CLI prompt.
+  timeout: 15,
   planTimeout: 300,
+  // Master switch. false → skip the phone entirely and return ASK immediately,
+  // so permission prompts stay in the terminal (no notification, no waiting).
+  notify: true,
   // autoApprove/autoDeny are reserved for future use and not yet implemented
   autoApprove: [],
   autoDeny: [],
@@ -32,6 +37,7 @@ export function loadConfig(configPath = CONFIG_PATH) {
     if (!Number.isFinite(config.planTimeout) || config.planTimeout <= 0) config.planTimeout = DEFAULT_CONFIG.planTimeout;
     if (!Array.isArray(config.autoApprove)) config.autoApprove = DEFAULT_CONFIG.autoApprove;
     if (!Array.isArray(config.autoDeny)) config.autoDeny = DEFAULT_CONFIG.autoDeny;
+    if (typeof config.notify !== "boolean") config.notify = DEFAULT_CONFIG.notify;
     if (typeof config.ntfyUsername !== "string") config.ntfyUsername = DEFAULT_CONFIG.ntfyUsername;
     if (typeof config.ntfyPassword !== "string") config.ntfyPassword = DEFAULT_CONFIG.ntfyPassword;
     if (typeof config.notifyOnStop !== "boolean") config.notifyOnStop = DEFAULT_CONFIG.notifyOnStop;

@@ -18,7 +18,7 @@ Claude Code ──spawn──▶ node bin/cli.mjs hook          (per event, stdi
   `{topic}-response`. Self-hostable (see [`../ntfy-server/README.md`](../ntfy-server/README.md)).
 - **Config** — `$XDG_CONFIG_HOME/remote-approver/config.json` (default
   `~/.config/remote-approver/config.json`). Holds server URL, topic, auth,
-  timeouts, `notifyOnStop`. No secrets live in the repo.
+  timeouts, `notify` (master switch), `notifyOnStop`. No secrets live in the repo.
 - **Hooks** — registered in `~/.claude/settings.json` under `PermissionRequest`
   (approve/deny, AskUserQuestion, plan review) and `Stop` (completion). Both run
   the same `cli.mjs hook`; it branches on `hook_event_name`.
@@ -38,8 +38,9 @@ Claude Code ──spawn──▶ node bin/cli.mjs hook          (per event, stdi
 
 1. Read config. If `hook_event_name === "Stop"` → `processStop` (fire-and-forget) and return `{}`.
 2. If no `topic` configured → return `ASK` (fall back to the terminal prompt).
-3. `AskUserQuestion` → `processAskUserQuestion` (option buttons; returns `updatedInput.answers`).
-4. Otherwise:
+3. If `notify === false` (master switch) → return `ASK` immediately: no publish, no wait, prompt stays in the terminal.
+4. `AskUserQuestion` → `processAskUserQuestion` (option buttons; returns `updatedInput.answers`).
+5. Otherwise:
    - `requestId = crypto.randomUUID()` — the anchor that keeps concurrent sessions from crossing.
    - `formatToolInfo(input)` → `{ title (with [project·sid] prefix), message, priority, tags, markdown }`.
    - `buildActions(...)` → Approve / Deny (+ Always-Approve when `permission_suggestions` present). Each button is an ntfy `http` action that POSTs `{requestId, approved[, alwaysAllow]}` to `{topic}-response`.

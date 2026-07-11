@@ -90,6 +90,32 @@ describe("processHook", () => {
     });
   });
 
+  // ==================== Master switch: notify=false ====================
+
+  it("should return ask WITHOUT notifying when config.notify is false", async () => {
+    const deps = createDeps({
+      config: { topic: "t", ntfyServer: "https://ntfy.sh", timeout: 15, notify: false },
+    });
+
+    const result = await processHook(sampleInput, deps);
+
+    assert.equal(result.hookSpecificOutput.decision.behavior, "ask", "should keep the prompt in the terminal");
+    assert.equal(deps.sendNotification.mock.callCount(), 0, "must NOT publish to the phone when notify is off");
+    assert.equal(deps.waitForResponse.mock.callCount(), 0, "must NOT wait on the phone when notify is off");
+  });
+
+  it("should notify normally when config.notify is true (default)", async () => {
+    const deps = createDeps({
+      config: { topic: "t", ntfyServer: "https://ntfy.sh", timeout: 15, notify: true },
+      waitResult: { approved: true },
+    });
+
+    const result = await processHook(sampleInput, deps);
+
+    assert.equal(result.hookSpecificOutput.decision.behavior, "allow");
+    assert.equal(deps.waitForResponse.mock.callCount(), 1, "should wait on the phone when notify is on");
+  });
+
   it("should not call sendNotification when config has no topic", async () => {
     const noTopicConfig = {
       topic: "",
