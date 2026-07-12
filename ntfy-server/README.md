@@ -45,7 +45,7 @@ phone / hook  →  Cloudflare edge (TLS)  →  tunnel  →  sbox localhost:2586 
 ```bash
 NTFY_DOMAIN=ntfy.example.com ./deploy-ntfy-cloudflared.sh
 # or, reusing/naming a tunnel and fixing the user:
-NTFY_DOMAIN=ntfy.example.com NTFY_TUNNEL=ntfy NTFY_USER=phil ./deploy-ntfy-cloudflared.sh
+NTFY_DOMAIN=ntfy.example.com NTFY_TUNNEL=ntfy NTFY_USER=alex ./deploy-ntfy-cloudflared.sh
 ```
 
 Remotely (scp + ssh):
@@ -66,7 +66,7 @@ service, and verifies `https://NTFY_DOMAIN/v1/health` through the edge.
 | Var | Default | Meaning |
 |---|---|---|
 | `NTFY_DOMAIN` | — (required) | public hostname, e.g. `ntfy.creast.win` |
-| `NTFY_USER` | `phil` | admin username |
+| `NTFY_USER` | `alex` | admin username |
 | `NTFY_PASS` | *(auto-generated, printed)* | admin password |
 | `NTFY_PORT` | `2586` | localhost port ntfy binds to |
 | `NTFY_TUNNEL` | `ntfy` | cloudflared tunnel name (reused if it exists) |
@@ -83,7 +83,7 @@ cloudflared tunnel list                     # tunnels on the account
 
 > **Live reference deployment:** ntfy runs on **sbox** at
 > `https://ntfy.creast.win` via tunnel `ntfy-sbox`, ntfy bound to
-> `127.0.0.1:2586`, deny-all + admin `phil`. Deployed with:
+> `127.0.0.1:2586`, deny-all + admin `alex`. Deployed with:
 > `NTFY_DOMAIN=ntfy.creast.win NTFY_TUNNEL=ntfy-sbox bash deploy-ntfy-cloudflared.sh`
 
 ---
@@ -98,9 +98,9 @@ Use when you don't want Cloudflare in the path. `deploy-ntfy.sh` auto-selects:
 
 ```bash
 # HTTP-only (port 8080)
-sudo NTFY_USER=phil NTFY_PASS='s3cret' ./deploy-ntfy.sh
+sudo NTFY_USER=alex NTFY_PASS='s3cret' ./deploy-ntfy.sh
 # HTTPS with a domain
-sudo NTFY_USER=phil NTFY_PASS='s3cret' NTFY_DOMAIN=ntfy.example.com ./deploy-ntfy.sh
+sudo NTFY_USER=alex NTFY_PASS='s3cret' NTFY_DOMAIN=ntfy.example.com ./deploy-ntfy.sh
 ```
 
 ### Env vars
@@ -128,7 +128,7 @@ Manage (compose-based): `cd /opt/ntfy && sudo docker compose {logs -f,restart,do
    {
      "topic": "cra-<32hex>",
      "ntfyServer": "https://ntfy.example.com",
-     "ntfyUsername": "phil",
+     "ntfyUsername": "alex",
      "ntfyPassword": "<password>",
      "notifyOnStop": true
    }
@@ -144,12 +144,12 @@ Because the server is **private (`deny-all`)**, you **must enter the username/pa
 1. Install the **ntfy** app — [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy) or [F-Droid](https://f-droid.org/en/packages/io.heckel.ntfy/). The F-Droid build always uses instant delivery (no Firebase).
 2. **Add the account first:** Settings → **Users** (Manage users) → add:
    - Server / Base URL: `https://ntfy.example.com`
-   - Username: `phil`
+   - Username: `alex`
    - Password: your password
 3. **Subscribe to the topic:** tap **+** → enter your `cra-…` topic → tap **Use another server** and enter `https://ntfy.example.com` → **Subscribe**. The app uses the credentials you added for that server automatically.
 4. Send a test from any machine (`remote-approver test`) or via curl:
    ```bash
-   curl -u 'phil:<password>' -d "hello from ntfy" https://ntfy.example.com/<your-topic>
+   curl -u 'alex:<password>' -d "hello from ntfy" https://ntfy.example.com/<your-topic>
    ```
 
 Notes:

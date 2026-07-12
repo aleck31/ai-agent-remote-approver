@@ -18,9 +18,9 @@
 #                            box). Caddy gets a Let's Encrypt cert automatically.
 #
 # Usage:
-#   sudo NTFY_USER=phil NTFY_PASS='s3cret' ./deploy-ntfy.sh                 # HTTP-only, port 8080
-#   sudo NTFY_USER=phil NTFY_PASS='s3cret' NTFY_PORT=8080 ./deploy-ntfy.sh
-#   sudo NTFY_USER=phil NTFY_PASS='s3cret' NTFY_DOMAIN=ntfy.example.com ./deploy-ntfy.sh   # HTTPS
+#   sudo NTFY_USER=alex NTFY_PASS='s3cret' ./deploy-ntfy.sh                 # HTTP-only, port 8080
+#   sudo NTFY_USER=alex NTFY_PASS='s3cret' NTFY_PORT=8080 ./deploy-ntfy.sh
+#   sudo NTFY_USER=alex NTFY_PASS='s3cret' NTFY_DOMAIN=ntfy.example.com ./deploy-ntfy.sh   # HTTPS
 #
 # Teardown:  cd /opt/ntfy && sudo docker compose down       (add -v to wipe data)
 
@@ -39,7 +39,7 @@ log()  { printf '\033[1;34m[ntfy-deploy]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*"; }
 die()  { printf '\033[1;31m[error]\033[0m %s\n' "$*" >&2; exit 1; }
 
-[ -n "$NTFY_USER" ] || die "NTFY_USER is required (e.g. NTFY_USER=phil)"
+[ -n "$NTFY_USER" ] || die "NTFY_USER is required (e.g. NTFY_USER=alex)"
 [ -n "$NTFY_PASS" ] || die "NTFY_PASS is required (e.g. NTFY_PASS='s3cret')"
 
 SUDO=""

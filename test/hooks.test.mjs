@@ -123,9 +123,10 @@ describe("runInit", () => {
   // Auth prompt during init (TDD Red phase — runInit doesn't accept prompt yet)
   // =========================================================================
 
-  it("should prompt for auth and save credentials when user answers 'y'", async () => {
+  it("should prompt for server + auth and save credentials when user answers 'y'", async () => {
     let savedConfig = null;
-    const promptResponses = ["y", "myuser", "mypass"];
+    // Prompt order: server (blank = keep default), use-auth?, username, password.
+    const promptResponses = ["", "y", "myuser", "mypass"];
     let promptIdx = 0;
 
     const result = await runInit({
@@ -138,8 +139,38 @@ describe("runInit", () => {
       promptSecret: async (question) => promptResponses[promptIdx++],
     });
 
+    assert.equal(savedConfig.ntfyServer, "https://ntfy.sh", "blank server keeps the default");
     assert.equal(savedConfig.ntfyUsername, "myuser");
     assert.equal(savedConfig.ntfyPassword, "mypass");
+  });
+
+  it("should set a custom ntfy server from a flag (non-interactive)", async () => {
+    let savedConfig = null;
+    const result = await runInit({
+      configPath: tmpConfigPath,
+      generateTopic: () => "cra-flagtest",
+      saveConfig: (config) => { savedConfig = config; },
+      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, ntfyUsername: "", ntfyPassword: "", autoApprove: [], autoDeny: [] }),
+      // no prompt fn → must not block
+    }, { server: "https://ntfy.example.com", username: "u", password: "p" });
+
+    assert.equal(savedConfig.ntfyServer, "https://ntfy.example.com");
+    assert.equal(savedConfig.ntfyUsername, "u");
+    assert.equal(savedConfig.ntfyPassword, "p");
+    assert.equal(result.ntfyServer, "https://ntfy.example.com");
+  });
+
+  it("non-interactive with no flags keeps defaults and does not block on prompt", async () => {
+    let savedConfig = null;
+    await runInit({
+      configPath: tmpConfigPath,
+      generateTopic: () => "cra-noflag",
+      saveConfig: (config) => { savedConfig = config; },
+      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, ntfyUsername: "", ntfyPassword: "", autoApprove: [], autoDeny: [] }),
+    }, { interactive: false });
+
+    assert.equal(savedConfig.ntfyServer, "https://ntfy.sh");
+    assert.equal(savedConfig.ntfyUsername, "");
   });
 
   it("should skip auth when user answers 'n'", async () => {
@@ -151,10 +182,12 @@ describe("runInit", () => {
       generateTopic: () => "cra-authtest2",
       saveConfig: (config, path) => { savedConfig = config; },
       loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, ntfyUsername: "", ntfyPassword: "", autoApprove: [], autoDeny: [] }),
-      prompt: async () => "n",
+      // server prompt → blank (keep default), use-auth? → "n"
+      prompt: (() => { const r = ["", "n"]; let i = 0; return async () => r[i++]; })(),
     });
 
     // ntfyUsername/ntfyPassword should remain unchanged (empty)
+    assert.equal(savedConfig.ntfyServer, "https://ntfy.sh");
     assert.equal(savedConfig.ntfyUsername, "");
     assert.equal(savedConfig.ntfyPassword, "");
   });

@@ -11,11 +11,11 @@
 #
 # Usage:
 #   NTFY_DOMAIN=ntfy.example.com ./deploy-ntfy-cloudflared.sh
-#   NTFY_DOMAIN=ntfy.example.com NTFY_USER=phil NTFY_PASS='s3cret' ./deploy-ntfy-cloudflared.sh
+#   NTFY_DOMAIN=ntfy.example.com NTFY_USER=alex NTFY_PASS='s3cret' ./deploy-ntfy-cloudflared.sh
 #
 # Env (all optional except NTFY_DOMAIN):
 #   NTFY_DOMAIN  (required) public hostname, e.g. ntfy.creast.win
-#   NTFY_USER    admin username (default: phil)
+#   NTFY_USER    admin username (default: alex)
 #   NTFY_PASS    admin password (default: auto-generated, printed at the end)
 #   NTFY_PORT    localhost port for ntfy (default: 2586)
 #   NTFY_TUNNEL  cloudflared tunnel name (default: ntfy)
@@ -24,7 +24,7 @@
 set -euo pipefail
 
 NTFY_DOMAIN="${NTFY_DOMAIN:-}"
-NTFY_USER="${NTFY_USER:-phil}"
+NTFY_USER="${NTFY_USER:-alex}"
 NTFY_PASS="${NTFY_PASS:-$(openssl rand -hex 16)}"
 NTFY_PORT="${NTFY_PORT:-2586}"
 NTFY_TUNNEL="${NTFY_TUNNEL:-ntfy}"

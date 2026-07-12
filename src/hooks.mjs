@@ -151,10 +151,16 @@ export function unregisterStopHook(settingsPath) {
 /**
  * Runs first-time configuration only (no hook registration):
  * 1. Generate a topic
- * 2. Optionally prompt for auth
+ * 2. Set ntfyServer / auth from `opts` (non-interactive) or prompt for them
  * 3. Save the config
  * Hook registration is a separate concern — run `enable` after this.
  *
+ * Non-interactive (agent/script friendly): pass `opts.server` / `opts.username`
+ * / `opts.password` and it won't prompt. Interactive: pass `prompt`/`promptSecret`
+ * and omit those opts. If neither is available for a field, the default stands.
+ *
+ * @param {object} deps
+ * @param {{ server?: string, username?: string, password?: string, interactive?: boolean }} [opts]
  * @returns {{ topic, ntfyServer, configPath }}
  */
 export async function runInit({
@@ -164,13 +170,28 @@ export async function runInit({
   loadConfig,
   prompt,
   promptSecret,
-}) {
+}, opts = {}) {
   const topic = generateTopic();
 
   const config = loadConfig(configPath);
   config.topic = topic;
 
-  if (prompt) {
+  // ntfy server: explicit flag wins; else keep whatever loadConfig had (default
+  // or pre-written). Interactive mode may also ask.
+  if (typeof opts.server === "string" && opts.server) {
+    config.ntfyServer = opts.server;
+  }
+
+  // Auth: flags take precedence and imply non-interactive. Otherwise prompt
+  // (only when a prompt fn is provided AND opts.interactive isn't false).
+  if (opts.username != null || opts.password != null) {
+    if (opts.username != null) config.ntfyUsername = opts.username;
+    if (opts.password != null) config.ntfyPassword = opts.password;
+  } else if (prompt && opts.interactive !== false) {
+    if (typeof opts.server !== "string") {
+      const server = await prompt(`ntfy server URL (blank = ${config.ntfyServer}): `);
+      if (server?.trim()) config.ntfyServer = server.trim();
+    }
     const useAuth = await prompt("Use authenticated topics? (only for self-hosted ntfy servers) (y/n): ");
     if (useAuth?.toLowerCase() === "y") {
       config.ntfyUsername = await prompt("Username: ");

@@ -15,7 +15,7 @@ import qrcode from "qrcode-terminal";
 import { ASK } from "../src/adapters/claude-code.mjs";
 
 const USAGE =
-  "Usage: remote-approver <command>\n\nCommands:\n  init        Generate a topic and write config (no hook)\n  enable      Register the hooks\n  disable     Remove the hooks (keeps config)\n  test        Send a test notification (add --wait to verify the round trip)\n  status      Show current configuration\n  uninstall   Remove hooks and delete configuration\n  hook        Process a Claude Code hook (internal)\n";
+  "Usage: remote-approver <command>\n\nCommands:\n  init        Generate a topic and write config (no hook)\n              flags (non-interactive): --server <url> --user <name> --password <pw> [--no-input]\n  enable      Register the hooks\n  disable     Remove the hooks (keeps config)\n  test        Send a test notification (add --wait to verify the round trip)\n  status      Show current configuration\n  uninstall   Remove hooks and delete configuration\n  hook        Process a Claude Code hook (internal)\n";
 
 // ---------------------------------------------------------------------------
 // main
@@ -35,7 +35,21 @@ export async function main(args, deps) {
 
   switch (command) {
     case "init": {
-      const result = await deps.runInit(deps);
+      // Flags for non-interactive / scripted setup (agent-friendly):
+      //   --server <url> --user <name> --password <pw>   (or --no-input)
+      const flag = (name) => {
+        const i = args.indexOf(name);
+        return i >= 0 && i + 1 < args.length ? args[i + 1] : undefined;
+      };
+      const server = flag("--server");
+      const username = flag("--user");
+      const password = flag("--password");
+      // Non-interactive when any flag is given, --no-input is passed, or stdin isn't a TTY.
+      const anyFlag = server !== undefined || username !== undefined || password !== undefined;
+      const nonInteractive = anyFlag || args.includes("--no-input") || deps.isTTY === false;
+
+      const opts = { server, username, password, interactive: !nonInteractive };
+      const result = await deps.runInit(deps, opts);
       deps.stdout.write(`Config initialized. Topic: ${result.topic}\n\n`);
 
       try {
@@ -288,6 +302,7 @@ if (isMain) {
     stdout: process.stdout,
     stderr: process.stderr,
     stdin: stdinData,
+    isTTY: process.stdin.isTTY === true,
     exit: process.exit,
     prompt: async (question) => {
       const { createInterface } = await import("node:readline");
