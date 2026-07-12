@@ -13,7 +13,7 @@ export const DEFAULT_CONFIG = {
   // Balance two conflicting needs: short enough that sitting AT the terminal
   // isn't hijacked for long, yet long enough to read + tap on the phone
   // (AskUserQuestion especially). 49s is the compromise.
-  timeout: 49,
+  timeout: 60,
   planTimeout: 300,
   // Master switch. false → skip the phone entirely and return ASK immediately,
   // so permission prompts stay in the terminal (no notification, no waiting).

@@ -35,16 +35,17 @@ describe("formatToolInfo", () => {
     assert.ok("message" in result, "result should have a message property");
   });
 
-  it("should include the tool name in the title", () => {
+  it("should include the tool name in the message subtitle", () => {
     const result = formatToolInfo({
       hook_event_name: "PreToolUse",
       tool_name: "Bash",
       tool_input: { command: "echo hello" },
     });
 
+    // Tool name moved out of the plain-text title into the card subtitle (in message).
     assert.ok(
-      result.title.includes("Bash"),
-      `Title should include tool name "Bash", got: "${result.title}"`
+      result.message.includes("Bash"),
+      `Message should include tool name "Bash", got: "${result.message}"`
     );
   });
 
@@ -163,17 +164,18 @@ describe("formatToolInfo", () => {
 
   // ==================== Plan Approval Notification ====================
 
-  it("should return title 'Claude Code: Plan Review' when tool_input contains a plan field", () => {
+  it("should label the card 'Plan Review' when tool_input contains a plan field", () => {
     const result = formatToolInfo({
       hook_event_name: "PermissionRequest",
       tool_name: "ExitPlanMode",
       tool_input: { plan: "# My Plan\n\n## Steps\n1. Do something" },
     });
 
+    // The "Plan Review" label lives in the card subtitle (and message), not the title.
     assert.equal(
-      result.title,
-      "Claude Code: Plan Review",
-      `Title should be "Claude Code: Plan Review" for plan inputs, got: "${result.title}"`
+      result.subtitle,
+      "Claude Code: `Plan Review`",
+      `Subtitle should be "Claude Code: \`Plan Review\`" for plan inputs, got: "${result.subtitle}"`
     );
   });
 
@@ -186,17 +188,19 @@ describe("formatToolInfo", () => {
       },
     });
 
+    // The card subtitle uses a "####" heading, so assert on the plan body preview
+    // (result.body), which is the plan text after markdown stripping.
     assert.ok(
-      !result.message.includes("#"),
-      `Message should not contain markdown "#" headers, got: "${result.message}"`
+      !result.body.includes("#"),
+      `Plan body should not contain markdown "#" headers, got: "${result.body}"`
     );
     assert.ok(
-      result.message.includes("My Plan"),
-      `Message should contain plan title text, got: "${result.message}"`
+      result.body.includes("My Plan"),
+      `Body should contain plan title text, got: "${result.body}"`
     );
     assert.ok(
-      result.message.includes("Some context here"),
-      `Message should contain plan body text, got: "${result.message}"`
+      result.body.includes("Some context here"),
+      `Body should contain plan body text, got: "${result.body}"`
     );
   });
 
@@ -208,17 +212,18 @@ describe("formatToolInfo", () => {
       tool_input: { plan: longPlan },
     });
 
+    // Clip is applied to the body (the card header adds a fixed prefix in message).
     assert.ok(
-      result.message.length <= 1003,
-      `Message should be at most 1003 characters (1000 + "..."), got length: ${result.message.length}`
+      result.body.length <= 1003,
+      `Body should be at most 1003 characters (1000 + "..."), got length: ${result.body.length}`
     );
     assert.ok(
-      result.message.length > 303,
-      `Message should use 1000-char limit (not old 300-char limit), got length: ${result.message.length}`
+      result.body.length > 303,
+      `Body should use 1000-char limit (not old 300-char limit), got length: ${result.body.length}`
     );
     assert.ok(
-      result.message.endsWith("..."),
-      `Message should end with "..." when truncated, got: "${result.message.slice(-10)}"`
+      result.body.endsWith("..."),
+      `Body should end with "..." when truncated, got: "${result.body.slice(-10)}"`
     );
   });
 
@@ -230,10 +235,10 @@ describe("formatToolInfo", () => {
       tool_input: { command: longCommand },
     });
 
-    // Command is fenced; the clipped body is 300 chars + "..." between the fences.
-    assert.ok(result.message.startsWith("```\n") && result.message.endsWith("\n```"), `should be fenced, got: ${result.message.slice(0, 12)}…`);
-    const body = result.message.slice(4, -4);
-    assert.equal(body, "x".repeat(300) + "...", "command body should be clipped to 300 chars + ...");
+    // Command is fenced; the clipped preview is 300 chars + "..." between the fences.
+    assert.ok(result.body.startsWith("```\n") && result.body.endsWith("\n```"), `should be fenced, got: ${result.body.slice(0, 12)}…`);
+    const fenced = result.body.slice(4, -4);
+    assert.equal(fenced, "x".repeat(300) + "...", "command body should be clipped to 300 chars + ...");
   });
 
   it("should fence a short Bash command without clipping", () => {
@@ -244,7 +249,7 @@ describe("formatToolInfo", () => {
       tool_input: { command: shortCommand },
     });
 
-    assert.equal(result.message, "```\n" + shortCommand + "\n```", "short command should be fenced verbatim");
+    assert.equal(result.body, "```\n" + shortCommand + "\n```", "short command should be fenced verbatim");
   });
 
   it("should render a leading '#' in a Bash command literally (fenced), not as an H1", () => {
@@ -254,9 +259,9 @@ describe("formatToolInfo", () => {
       tool_input: { command: "# cleanup\nrm -rf build/*" },
     });
     // The '#' and '*' survive verbatim inside the fence.
-    assert.ok(result.message.includes("# cleanup"), "comment line preserved");
-    assert.ok(result.message.includes("rm -rf build/*"), "glob preserved");
-    assert.ok(result.message.startsWith("```\n"), "wrapped in a code fence");
+    assert.ok(result.body.includes("# cleanup"), "comment line preserved");
+    assert.ok(result.body.includes("rm -rf build/*"), "glob preserved");
+    assert.ok(result.body.startsWith("```\n"), "wrapped in a code fence");
   });
 
   it("should widen the fence when the command itself contains a triple backtick", () => {
@@ -266,8 +271,8 @@ describe("formatToolInfo", () => {
       tool_input: { command: "echo '```'" },
     });
     // A 3-backtick run inside forces a 4-backtick fence so the block isn't cut short.
-    assert.ok(result.message.startsWith("````\n"), `expected a 4-backtick fence, got: ${result.message.slice(0, 6)}`);
-    assert.ok(result.message.includes("```"), "inner triple backtick preserved");
+    assert.ok(result.body.startsWith("````\n"), `expected a 4-backtick fence, got: ${result.body.slice(0, 6)}`);
+    assert.ok(result.body.includes("```"), "inner triple backtick preserved");
   });
 
   it("should truncate long messages from unknown tools via default branch", () => {
@@ -278,12 +283,12 @@ describe("formatToolInfo", () => {
       tool_input: largeInput,
     });
     assert.ok(
-      result.message.length <= 1003,
-      `Message should be at most 1003 characters (1000 + "..."), got length: ${result.message.length}`
+      result.body.length <= 1003,
+      `Body should be at most 1003 characters (1000 + "..."), got length: ${result.body.length}`
     );
     assert.ok(
-      result.message.endsWith("..."),
-      "Message should end with '...' when truncated"
+      result.body.endsWith("..."),
+      "Body should end with '...' when truncated"
     );
   });
 
@@ -317,8 +322,8 @@ describe("formatToolInfo", () => {
       tool_name: 'ExitPlanMode',
       tool_input: { plan: '' },
     });
-    assert.equal(result.title, "Claude Code: Plan Review");
-    assert.equal(result.message, "(empty plan)");
+    assert.equal(result.subtitle, "Claude Code: `Plan Review`");
+    assert.equal(result.body, "(empty plan)");
   });
 
   it("should not trigger plan detection for non-ExitPlanMode tools with a plan field", () => {
@@ -327,7 +332,7 @@ describe("formatToolInfo", () => {
       tool_name: 'Bash',
       tool_input: { command: 'echo test', plan: 'some field' },
     });
-    assert.equal(result.title, "Claude Code: Bash");
+    assert.equal(result.subtitle, "Claude Code: `Bash`");
     assert.ok(result.message.includes("echo test"), `Should format as Bash command, got: "${result.message}"`);
   });
 
@@ -339,8 +344,8 @@ describe("formatToolInfo", () => {
       tool_name: 'ExitPlanMode',
       tool_input: { plan: '# \n## \n### ' },
     });
-    assert.equal(result.title, "Claude Code: Plan Review");
-    assert.equal(result.message, "(empty plan)");
+    assert.equal(result.subtitle, "Claude Code: `Plan Review`");
+    assert.equal(result.body, "(empty plan)");
   });
 });
 
@@ -358,8 +363,9 @@ describe("formatToolInfo (rich enrichment)", () => {
     assert.equal(typeof result.priority, "number");
     assert.ok(result.priority >= 1 && result.priority <= 5);
     assert.ok(!("tags" in result), "formatToolInfo must not emit tags (would render a second emoji)");
-    // Title is emoji-free; the caller prepends the state emoji.
-    assert.equal(result.title, "Claude Code: Bash");
+    // Title holds only the session tag (empty here); the tool name is in the subtitle.
+    assert.equal(result.title, "");
+    assert.equal(result.subtitle, "Claude Code: `Bash`");
   });
 
   it("should prepend the Bash description when present", () => {
@@ -400,7 +406,7 @@ describe("formatToolInfo (rich enrichment)", () => {
       tool_input: { plan: "# Plan\nDo it" },
     });
     assert.ok(!("tags" in result), "no tags emitted");
-    assert.equal(result.title, "Claude Code: Plan Review");
+    assert.equal(result.subtitle, "Claude Code: `Plan Review`");
     assert.equal(result.priority, PRIORITY.default);
   });
 });
@@ -440,26 +446,30 @@ describe("formatToolInfo title prefixing", () => {
       cwd: "/home/u/ai-stack",
       session_id: "abcdef123456",
     });
-    assert.equal(result.title, "[ai-stack\u00b7abcdef] Claude Code: Bash");
+    // Title carries only the [proj\u00b7sid] tag now; the tool name is in the subtitle.
+    assert.equal(result.title, "[ai-stack\u00b7abcdef]");
+    assert.equal(result.subtitle, "Claude Code: `Bash`");
   });
 
-  it("leaves the title unprefixed when no session context", () => {
+  it("leaves the title empty when no session context", () => {
     const result = formatToolInfo({
       hook_event_name: "PermissionRequest",
       tool_name: "Bash",
       tool_input: { command: "ls" },
     });
-    assert.equal(result.title, "Claude Code: Bash");
+    assert.equal(result.title, "");
+    assert.equal(result.subtitle, "Claude Code: `Bash`");
   });
 
-  it("prefixes the Plan Review title too", () => {
+  it("prefixes the Plan Review title with the tag too", () => {
     const result = formatToolInfo({
       hook_event_name: "PermissionRequest",
       tool_name: "ExitPlanMode",
       tool_input: { plan: "# Plan" },
       cwd: "/x/proj",
     });
-    assert.equal(result.title, "[proj] Claude Code: Plan Review");
+    assert.equal(result.title, "[proj]");
+    assert.equal(result.subtitle, "Claude Code: `Plan Review`");
   });
 });
 
@@ -474,26 +484,29 @@ describe("formatStopNotification", () => {
       session_id: "abcdef123456",
       last_assistant_message: "All done. Refactored auth.",
     });
-    assert.equal(r.title, "\ud83c\udfc1 [ai-stack\u00b7abcdef] Claude Code: Done");
-    assert.equal(r.message, "All done. Refactored auth.");
+    // Title = \ud83c\udfc1 [proj\u00b7sid]; the "Claude Code: Done" label is the card subtitle in message.
+    assert.equal(r.title, "\ud83c\udfc1 [ai-stack\u00b7abcdef]");
+    assert.equal(r.message, "##### Claude Code: `Done`\n---\nAll done. Refactored auth.");
     assert.ok(!("tags" in r), "no tags emitted (\ud83c\udfc1 state emoji is in the title)");
     assert.equal(r.priority, PRIORITY.default);
   });
 
   it("falls back to 'Task complete.' when no message", () => {
     const r = formatStopNotification({ cwd: "/x/proj" });
-    assert.equal(r.title, "\ud83c\udfc1 [proj] Claude Code: Done");
-    assert.equal(r.message, "Task complete.");
+    assert.equal(r.title, "\ud83c\udfc1 [proj]");
+    assert.equal(r.message, "##### Claude Code: `Done`\n---\nTask complete.");
   });
 
-  it("clips a long message to 403 chars with ellipsis", () => {
+  it("clips a long message body to 400 chars with ellipsis", () => {
     const r = formatStopNotification({ last_assistant_message: "y".repeat(600) });
-    assert.ok(r.message.length <= 403);
-    assert.ok(r.message.endsWith("..."));
+    // The card header ("##### Claude Code: `Done`\n---\n") prefixes a body clipped to 400 + "...".
+    const body = r.message.slice("##### Claude Code: `Done`\n---\n".length);
+    assert.ok(body.length <= 403);
+    assert.ok(body.endsWith("..."));
   });
 
   it("has no session prefix when cwd/session_id absent", () => {
     const r = formatStopNotification({ last_assistant_message: "hi" });
-    assert.equal(r.title, "\ud83c\udfc1 Claude Code: Done");
+    assert.equal(r.title, "\ud83c\udfc1");
   });
 });

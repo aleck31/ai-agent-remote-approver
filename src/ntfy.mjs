@@ -521,6 +521,30 @@ export const STATUS = Object.freeze({
   done: "🏁",
 });
 
+/**
+ * The single source of the card subtitle format. `kind` (a tool name, "Plan
+ * Review", a question header, "Done"…) is wrapped in backticks so it renders as
+ * code. Change the subtitle style here and every card follows.
+ *
+ * @param {string} kind
+ */
+export function subtitle(kind) {
+  return `Claude Code: \`${kind}\``;
+}
+
+/**
+ * Build a card's message body: the subtitle heading (kept out of the plain-text
+ * title, which only holds the state emoji + [proj·sid]), a horizontal rule, then
+ * the body. The `####` + `---` render as a small heading and a separator line in
+ * ntfy's markdown, giving the flat title/body a clear layout.
+ *
+ * @param {string} subtitleText - e.g. subtitle("Bash")
+ * @param {string} body - the preview/detail (may contain markdown)
+ */
+export function cardBody(subtitleText, body) {
+  return `##### ${subtitleText}\n---\n${body}`;
+}
+
 const PREVIEW_MAX_LENGTH = 1000;
 // Commands / code / long free-text are clipped short for the phone; the full
 // text is always visible in the terminal. Titles/paths are not clipped here.
@@ -690,13 +714,14 @@ export function formatStopNotification({ cwd, session_id, last_assistant_message
   // '##'/'**'/'- ' as markdown produces headings larger than the notification
   // title and a messy body. Show clean plain text (like Plan Review does).
   const msg = raw ? stripMarkdown(raw) : "Task complete.";
-  const prefix = tag ? `[${tag}] ` : "";
-  // Same title shape as the other cards: <emoji> [proj·sid] Claude Code: <what>.
+  // Same card shape as the others: title = 🏁 [proj·sid]; subtitle + body in the
+  // markdown message. markdown:true so the #### subtitle / --- rule render (msg
+  // itself is already markdown-stripped plain text, safe inside the card).
   return {
-    title: `${STATUS.done} ${prefix}Claude Code: Done`,
-    message: clip(msg, 400),
+    title: `${STATUS.done}${tag ? ` [${tag}]` : ""}`,
+    message: cardBody(subtitle("Done"), clip(msg, 400)),
     priority: PRIORITY.default,
-    markdown: false,
+    markdown: true,
   };
 }
 
@@ -714,27 +739,21 @@ export function formatStopNotification({ cwd, session_id, last_assistant_message
  */
 export function formatToolInfo({ hook_event_name, tool_name, tool_input, cwd, session_id }) {
   const tag = sessionTag({ cwd, session_id });
-  const prefix = tag ? `[${tag}] ` : "";
+  // Title (plain text) = state emoji (added by caller) + [proj·sid] only. The
+  // "Claude Code: <tool>" subtitle moves into the markdown body via cardBody(),
+  // rendered as a small heading above a separator line. `subtitle`/`body`/`tag`
+  // are returned too so the resolved card can rebuild the same layout.
+  const title = tag ? `[${tag}]` : "";
 
-  // Title is kept emoji-free here; the caller prepends the state emoji (⏳ for
-  // pending, ✅/❌/… once resolved) so the title carries exactly one state emoji.
-  // We deliberately don't emit ntfy `tags` (they'd render a second emoji).
   if (tool_name === 'ExitPlanMode' && typeof tool_input?.plan === 'string') {
     const plain = tool_input.plan.trim() ? stripMarkdown(tool_input.plan) : '';
-    const message = clip(plain || '(empty plan)', PREVIEW_MAX_LENGTH);
-    return {
-      title: `${prefix}Claude Code: Plan Review`,
-      message,
-      priority: PRIORITY.default,
-      markdown: false,
-    };
+    const body = clip(plain || '(empty plan)', PREVIEW_MAX_LENGTH);
+    const sub = subtitle("Plan Review");
+    return { title, tag, subtitle: sub, body, message: cardBody(sub, body), priority: PRIORITY.default, markdown: true };
   }
 
   const { message, priority } = formatToolPreview(tool_name, tool_input);
-  return {
-    title: `${prefix}Claude Code: ${tool_name}`,
-    message: clip(message, PREVIEW_MAX_LENGTH),
-    priority,
-    markdown: true,
-  };
+  const body = clip(message, PREVIEW_MAX_LENGTH);
+  const sub = subtitle(tool_name);
+  return { title, tag, subtitle: sub, body, message: cardBody(sub, body), priority, markdown: true };
 }

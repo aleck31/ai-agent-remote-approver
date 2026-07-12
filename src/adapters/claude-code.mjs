@@ -4,7 +4,7 @@
 
 import crypto from "node:crypto";
 import { DEFAULT_CONFIG } from "../config.mjs";
-import { buildAuthHeader, sessionTag, formatStopNotification, STATUS } from "../ntfy.mjs";
+import { buildAuthHeader, sessionTag, formatStopNotification, STATUS, cardBody, subtitle } from "../ntfy.mjs";
 
 export const ASK = Object.freeze({ hookSpecificOutput: Object.freeze({ hookEventName: "PermissionRequest", decision: Object.freeze({ behavior: "ask" }) }) });
 const DENY = Object.freeze({ hookSpecificOutput: Object.freeze({ hookEventName: "PermissionRequest", decision: Object.freeze({ behavior: "deny" }) }) });
@@ -60,6 +60,23 @@ export function buildActions(server, topic, requestId, { permissionSuggestions, 
 }
 
 /**
+ * A single "kept" action for a resolved card — the option the user actually
+ * chose, so the actions area still reflects the choice. Same http POST target
+ * as the pending buttons (re-tapping just repeats the answer, harmlessly).
+ */
+export function keptAction(server, topic, requestId, label, bodyObj, { auth } = {}) {
+  const authHeaders = auth ? buildAuthHeader(auth) : undefined;
+  return {
+    action: "http",
+    label,
+    url: `${server}/${topic}-response`,
+    body: JSON.stringify({ requestId, ...bodyObj }),
+    method: "POST",
+    ...(authHeaders && { headers: authHeaders }),
+  };
+}
+
+/**
  * Send with retry, returning null on exhausted retries.
  * Uses linear backoff: delay = RETRY_DELAY_MS * attempt (1s, 2s, …).
  */
@@ -98,7 +115,7 @@ const RESOLVED_EMOJI = Object.freeze({
  * word); `detail` (e.g. the chosen answer) is shown as the body so you can see
  * what you picked. Best-effort; failures swallowed. No-op without updateNotification.
  */
-async function sendResolved(updateNotification, { server, topic, requestId, baseTitle, message, outcome, detail, auth }) {
+async function sendResolved(updateNotification, { server, topic, requestId, tag, subtitle, body, outcome, action, auth }) {
   if (!updateNotification) return;
   const emoji = RESOLVED_EMOJI[outcome] || STATUS.timeout;
   try {
@@ -107,10 +124,14 @@ async function sendResolved(updateNotification, { server, topic, requestId, base
       topic,
       sequenceId: requestId,
       requestId,
-      title: `${emoji} ${baseTitle}`,
-      // Body: the outcome detail (the picked answer) is what matters post-decision.
-      message: detail || message || "",
-      actions: [],
+      // Title: state emoji + [proj·sid]. Subtitle + body live in the markdown card.
+      title: `${emoji}${tag ? ` [${tag}]` : ""}`,
+      message: cardBody(subtitle, body),
+      // Keep ONLY the chosen action (the picked option / Approve|Deny); drop the
+      // rest. It stays tappable (ntfy has no disabled button) but re-tapping just
+      // repeats the same answer to a topic nobody's listening on — harmless, and
+      // it shows in the actions area what you chose. Timeout keeps no button.
+      actions: action ? [action] : [],
       priority: 2,
       markdown: true,
       ...(auth && { auth }),
@@ -173,11 +194,12 @@ export async function processAskUserQuestion(input, deps) {
   const questions = input.tool_input.questions;
   const answers = {};
   const qTag = sessionTag(input);
-  const qPrefix = qTag ? `[${qTag}] ` : "";
+  const qTitle = qTag ? `[${qTag}]` : "";
 
   for (const q of questions) {
     const requestId = crypto.randomUUID();
     const options = q.options;
+    const sub = subtitle(q.header || "Question");
 
     const MAX_BUTTONS = 3;
     const batches = [];
@@ -185,7 +207,6 @@ export async function processAskUserQuestion(input, deps) {
       batches.push(options.slice(j, j + MAX_BUTTONS));
     }
 
-    const baseTitle = `${qPrefix}Claude Code: ${q.header || "Question"}`;
     // Batches share one requestId/sequenceId, so a later resolved update replaces
     // the notification currently shown in the phone's tray.
     let anyBatchSent = false;
@@ -197,13 +218,13 @@ export async function processAskUserQuestion(input, deps) {
         const batch = batches[i];
         const batchInfo = batches.length > 1 ? `(${i + 1}/${batches.length})` : undefined;
         const actions = buildQuestionActions(config.ntfyServer, config.topic, requestId, batch, { ...(auth && { auth }) });
-        const message = buildQuestionMessage(q.question, batch, { multiSelect: q.multiSelect, batchInfo });
+        const body = buildQuestionMessage(q.question, batch, { multiSelect: q.multiSelect, batchInfo });
 
         const sent = await sendWithRetry(deps.sendNotification, {
           server: config.ntfyServer,
           topic: config.topic,
-          title: `${STATUS.pending} ${baseTitle}`,
-          message,
+          title: `${STATUS.pending}${qTitle ? ` ${qTitle}` : ""}`,
+          message: cardBody(sub, body),
           actions,
           requestId,
           sequenceId: requestId,
@@ -234,7 +255,7 @@ export async function processAskUserQuestion(input, deps) {
         if (anyBatchSent) {
           await sendResolved(deps.updateNotification, {
             server: config.ntfyServer, topic: config.topic, requestId,
-            baseTitle, message: q.question, outcome: "timeout",
+            tag: qTag, subtitle: sub, body: q.question, outcome: "timeout",
             ...(auth && { auth }),
           });
         }
@@ -246,10 +267,12 @@ export async function processAskUserQuestion(input, deps) {
 
     if (response.answer) {
       answers[q.question] = response.answer;
+      // Resolved: body = just the question; the chosen option stays as the sole
+      // kept button in the actions area (unpicked options dropped).
       await sendResolved(deps.updateNotification, {
         server: config.ntfyServer, topic: config.topic, requestId,
-        baseTitle,
-        message: q.question, outcome: "answer", detail: response.answer,
+        tag: qTag, subtitle: sub, body: q.question, outcome: "answer",
+        action: keptAction(config.ntfyServer, config.topic, requestId, `${STATUS.answer} ${response.answer}`, { answer: response.answer }, { ...(auth && { auth }) }),
         ...(auth && { auth }),
       });
     } else {
@@ -338,15 +361,24 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
   }
 
   const requestId = crypto.randomUUID();
-  const { title, message, priority, markdown } = formatToolInfo(input);
+  const { title, tag, subtitle, body, message, priority, markdown } = formatToolInfo(input);
   const actions = buildActions(config.ntfyServer, config.topic, requestId, {
     permissionSuggestions: input.permission_suggestions,
     ...(auth && { auth }),
   });
 
+  // The chosen button to keep on the resolved card (timeout keeps none).
+  const ka = (label, bodyObj) => keptAction(config.ntfyServer, config.topic, requestId, label, bodyObj, { ...(auth && { auth }) });
+  const KEPT = {
+    // Label word first, then a check/cross — the title already carries the
+    // state emoji, so no leading ✅/❌ here (would double up).
+    allow:  ka("Approved ✔", { approved: true }),
+    always: ka("Always approved ✔", { approved: true, alwaysAllow: true }),
+    deny:   ka("Denied ✖", { approved: false }),
+  };
   const resolve = (outcome) => sendResolved(updateNotification, {
     server: config.ntfyServer, topic: config.topic, requestId,
-    baseTitle: title, message, outcome, ...(auth && { auth }),
+    tag, subtitle, body, outcome, action: KEPT[outcome], ...(auth && { auth }),
   });
 
   // Publish only once the SSE subscription is live (inside onReady), so a fast

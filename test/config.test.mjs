@@ -107,7 +107,7 @@ describe("DEFAULT_CONFIG", () => {
   });
 
   it("should have a moderate default timeout (49s): terminal not hijacked for long, yet enough to tap on the phone", () => {
-    assert.equal(DEFAULT_CONFIG.timeout, 49);
+    assert.equal(DEFAULT_CONFIG.timeout, 60);
   });
 
   it("should default notify to true (phone notifications on)", () => {
@@ -165,7 +165,7 @@ describe("loadConfig", () => {
     assert.deepEqual(config, {
       topic: "",
       ntfyServer: "https://ntfy.sh",
-      timeout: 49,
+      timeout: 60,
       planTimeout: 300,
       notify: true,
       autoApprove: [],
