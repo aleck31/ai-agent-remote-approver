@@ -196,7 +196,7 @@ describe("processAskUserQuestion", () => {
       assert.equal(deps.updateNotification.mock.callCount(), 1, "should resolve the lingering pending card exactly once");
       const u = deps.updateNotification.mock.calls[0].arguments[0];
       assert.deepEqual(u.actions, [], "resolved card is button-less");
-      assert.ok(u.title.includes("Timed out"), `resolved as timeout, got: ${u.title}`);
+      assert.ok(u.title.startsWith("⏱️ "), `resolved as timeout, got: ${u.title}`);
     } finally {
       _internal.delay = originalDelay;
     }

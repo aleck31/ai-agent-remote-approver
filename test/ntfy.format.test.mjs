@@ -349,7 +349,7 @@ describe("formatToolInfo", () => {
 // ---------------------------------------------------------------------------
 
 describe("formatToolInfo (rich enrichment)", () => {
-  it("should attach a numeric priority and emoji tags to every result", () => {
+  it("should attach a numeric priority and NOT emit ntfy tags (emoji is the state, added by the caller)", () => {
     const result = formatToolInfo({
       hook_event_name: "PreToolUse",
       tool_name: "Bash",
@@ -357,7 +357,9 @@ describe("formatToolInfo (rich enrichment)", () => {
     });
     assert.equal(typeof result.priority, "number");
     assert.ok(result.priority >= 1 && result.priority <= 5);
-    assert.ok(Array.isArray(result.tags) && result.tags.length > 0);
+    assert.ok(!("tags" in result), "formatToolInfo must not emit tags (would render a second emoji)");
+    // Title is emoji-free; the caller prepends the state emoji.
+    assert.equal(result.title, "Claude Code: Bash");
   });
 
   it("should prepend the Bash description when present", () => {
@@ -391,13 +393,14 @@ describe("formatToolInfo (rich enrichment)", () => {
     assert.ok(result.message.includes("3 lines"));
   });
 
-  it("should use the clipboard tag and default priority for Plan Review", () => {
+  it("should use default priority and no tags for Plan Review", () => {
     const result = formatToolInfo({
       hook_event_name: "PermissionRequest",
       tool_name: "ExitPlanMode",
       tool_input: { plan: "# Plan\nDo it" },
     });
-    assert.deepEqual(result.tags, ["clipboard"]);
+    assert.ok(!("tags" in result), "no tags emitted");
+    assert.equal(result.title, "Claude Code: Plan Review");
     assert.equal(result.priority, PRIORITY.default);
   });
 });
@@ -471,15 +474,15 @@ describe("formatStopNotification", () => {
       session_id: "abcdef123456",
       last_assistant_message: "All done. Refactored auth.",
     });
-    assert.equal(r.title, "[ai-stack\u00b7abcdef] Claude \u5e72\u5b8c\u4e86");
+    assert.equal(r.title, "\ud83c\udfc1 [ai-stack\u00b7abcdef] Claude Code: Done");
     assert.equal(r.message, "All done. Refactored auth.");
-    assert.deepEqual(r.tags, ["white_check_mark"]);
+    assert.ok(!("tags" in r), "no tags emitted (\ud83c\udfc1 state emoji is in the title)");
     assert.equal(r.priority, PRIORITY.default);
   });
 
   it("falls back to 'Task complete.' when no message", () => {
     const r = formatStopNotification({ cwd: "/x/proj" });
-    assert.equal(r.title, "[proj] Claude \u5e72\u5b8c\u4e86");
+    assert.equal(r.title, "\ud83c\udfc1 [proj] Claude Code: Done");
     assert.equal(r.message, "Task complete.");
   });
 
@@ -491,6 +494,6 @@ describe("formatStopNotification", () => {
 
   it("has no session prefix when cwd/session_id absent", () => {
     const r = formatStopNotification({ last_assistant_message: "hi" });
-    assert.equal(r.title, "Claude \u5e72\u5b8c\u4e86");
+    assert.equal(r.title, "\ud83c\udfc1 Claude Code: Done");
   });
 });

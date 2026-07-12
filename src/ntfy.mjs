@@ -502,6 +502,25 @@ function stripInline(text) {
  */
 export const PRIORITY = Object.freeze({ min: 1, low: 2, default: 3, high: 4, urgent: 5 });
 
+/**
+ * Title-leading emoji conveys STATE only (not tool type — the tool name is in
+ * the title text). One emoji per state, placed at the start of the title.
+ *   pending    needs your attention
+ *   allow      approved
+ *   deny       denied
+ *   answer     answered (AskUserQuestion)
+ *   timeout    not handled in time → fell back to CLI
+ *   done       a turn finished (Stop notification)
+ */
+export const STATUS = Object.freeze({
+  pending: "❓",
+  allow: "✅",
+  deny: "❌",
+  answer: "💬",
+  timeout: "⏱️",
+  done: "🏁",
+});
+
 const PREVIEW_MAX_LENGTH = 1000;
 // Commands / code / long free-text are clipped short for the phone; the full
 // text is always visible in the terminal. Titles/paths are not clipped here.
@@ -666,15 +685,18 @@ export function sessionTag({ cwd, session_id } = {}) {
  */
 export function formatStopNotification({ cwd, session_id, last_assistant_message } = {}) {
   const tag = sessionTag({ cwd, session_id });
+  const raw = typeof last_assistant_message === "string" ? last_assistant_message.trim() : "";
+  // Strip markdown: the last message is arbitrary Claude output — rendering its
+  // '##'/'**'/'- ' as markdown produces headings larger than the notification
+  // title and a messy body. Show clean plain text (like Plan Review does).
+  const msg = raw ? stripMarkdown(raw) : "Task complete.";
   const prefix = tag ? `[${tag}] ` : "";
-  let msg = typeof last_assistant_message === "string" ? last_assistant_message.trim() : "";
-  if (!msg) msg = "Task complete.";
+  // Same title shape as the other cards: <emoji> [proj·sid] Claude Code: <what>.
   return {
-    title: `${prefix}Claude 干完了`,
+    title: `${STATUS.done} ${prefix}Claude Code: Done`,
     message: clip(msg, 400),
     priority: PRIORITY.default,
-    tags: ["white_check_mark"],
-    markdown: true,
+    markdown: false,
   };
 }
 
@@ -694,6 +716,9 @@ export function formatToolInfo({ hook_event_name, tool_name, tool_input, cwd, se
   const tag = sessionTag({ cwd, session_id });
   const prefix = tag ? `[${tag}] ` : "";
 
+  // Title is kept emoji-free here; the caller prepends the state emoji (⏳ for
+  // pending, ✅/❌/… once resolved) so the title carries exactly one state emoji.
+  // We deliberately don't emit ntfy `tags` (they'd render a second emoji).
   if (tool_name === 'ExitPlanMode' && typeof tool_input?.plan === 'string') {
     const plain = tool_input.plan.trim() ? stripMarkdown(tool_input.plan) : '';
     const message = clip(plain || '(empty plan)', PREVIEW_MAX_LENGTH);
@@ -701,17 +726,15 @@ export function formatToolInfo({ hook_event_name, tool_name, tool_input, cwd, se
       title: `${prefix}Claude Code: Plan Review`,
       message,
       priority: PRIORITY.default,
-      tags: ['clipboard'],
       markdown: false,
     };
   }
 
-  const { message, tags, priority } = formatToolPreview(tool_name, tool_input);
+  const { message, priority } = formatToolPreview(tool_name, tool_input);
   return {
     title: `${prefix}Claude Code: ${tool_name}`,
     message: clip(message, PREVIEW_MAX_LENGTH),
     priority,
-    tags,
     markdown: true,
   };
 }

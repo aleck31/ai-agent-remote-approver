@@ -4,7 +4,7 @@
 
 import crypto from "node:crypto";
 import { DEFAULT_CONFIG } from "../config.mjs";
-import { buildAuthHeader, sessionTag, formatStopNotification } from "../ntfy.mjs";
+import { buildAuthHeader, sessionTag, formatStopNotification, STATUS } from "../ntfy.mjs";
 
 export const ASK = Object.freeze({ hookSpecificOutput: Object.freeze({ hookEventName: "PermissionRequest", decision: Object.freeze({ behavior: "ask" }) }) });
 const DENY = Object.freeze({ hookSpecificOutput: Object.freeze({ hookEventName: "PermissionRequest", decision: Object.freeze({ behavior: "deny" }) }) });
@@ -79,37 +79,39 @@ export async function sendWithRetry(sendFn, params) {
 }
 
 /**
- * Outcome labels for the resolved (post-decision) notification update.
+ * Resolved-outcome → state emoji (STATUS). The emoji alone conveys the outcome;
+ * no redundant "Approved"/"Denied" word in the title. `always` reuses the allow
+ * emoji (it's still an approval).
  */
-const RESOLVED = Object.freeze({
-  allow:   { mark: "✅ Approved",        tag: "white_check_mark" },
-  always:  { mark: "✅ Always-approved", tag: "white_check_mark" },
-  deny:    { mark: "❌ Denied",          tag: "x" },
-  answer:  { mark: "💬 Answered",        tag: "speech_balloon" },
-  timeout: { mark: "⏱️ Timed out → CLI", tag: "hourglass" },
+const RESOLVED_EMOJI = Object.freeze({
+  allow:   STATUS.allow,
+  always:  STATUS.allow,
+  deny:    STATUS.deny,
+  answer:  STATUS.answer,
+  timeout: STATUS.timeout,
 });
 
 /**
- * Replace the pending approve/deny notification with a resolved, button-less
- * one (same sequenceId), so the phone notification flips from active → resolved
- * while preserving history and recording the outcome. Best-effort; failures are
- * swallowed since the decision already stands. No-op if updateNotification is
- * not injected (keeps unit tests that don't provide it unaffected).
+ * Replace the pending notification with a resolved, button-less one (same
+ * sequenceId), so the phone notification flips from ⏳ pending → outcome while
+ * preserving history. The title's leading state emoji IS the outcome (no extra
+ * word); `detail` (e.g. the chosen answer) is shown as the body so you can see
+ * what you picked. Best-effort; failures swallowed. No-op without updateNotification.
  */
 async function sendResolved(updateNotification, { server, topic, requestId, baseTitle, message, outcome, detail, auth }) {
   if (!updateNotification) return;
-  const r = RESOLVED[outcome] || RESOLVED.timeout;
+  const emoji = RESOLVED_EMOJI[outcome] || STATUS.timeout;
   try {
     await updateNotification({
       server,
       topic,
       sequenceId: requestId,
       requestId,
-      title: `${r.mark} · ${baseTitle}`,
-      message: detail ? `${detail}\n\n${message ?? ""}`.trim() : (message ?? ""),
+      title: `${emoji} ${baseTitle}`,
+      // Body: the outcome detail (the picked answer) is what matters post-decision.
+      message: detail || message || "",
       actions: [],
       priority: 2,
-      tags: [r.tag],
       markdown: true,
       ...(auth && { auth }),
     });
@@ -200,13 +202,12 @@ export async function processAskUserQuestion(input, deps) {
         const sent = await sendWithRetry(deps.sendNotification, {
           server: config.ntfyServer,
           topic: config.topic,
-          title: baseTitle,
+          title: `${STATUS.pending} ${baseTitle}`,
           message,
           actions,
           requestId,
           sequenceId: requestId,
           priority: 4,
-          tags: ["question"],
           markdown: true,
           ...(auth && { auth }),
         });
@@ -285,7 +286,7 @@ export async function processStop(input, config, { sendNotification, resolveAuth
   if (!config.notifyOnStop || !config.topic) return {};
 
   const auth = resolveAuth ? resolveAuth(config) : null;
-  const { title, message, priority, tags, markdown } = formatStopNotification(input);
+  const { title, message, priority, markdown } = formatStopNotification(input);
 
   await sendWithRetry(sendNotification, {
     server: config.ntfyServer,
@@ -295,7 +296,6 @@ export async function processStop(input, config, { sendNotification, resolveAuth
     actions: [],
     requestId: "stop",
     priority,
-    tags,
     markdown,
     ...(auth && { auth }),
   });
@@ -338,7 +338,7 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
   }
 
   const requestId = crypto.randomUUID();
-  const { title, message, priority, tags, markdown } = formatToolInfo(input);
+  const { title, message, priority, markdown } = formatToolInfo(input);
   const actions = buildActions(config.ntfyServer, config.topic, requestId, {
     permissionSuggestions: input.permission_suggestions,
     ...(auth && { auth }),
@@ -356,13 +356,12 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
     const sent = await sendWithRetry(sendNotification, {
       server: config.ntfyServer,
       topic: config.topic,
-      title,
+      title: `${STATUS.pending} ${title}`,
       message,
       actions,
       requestId,
       sequenceId: requestId,
       priority,
-      tags,
       markdown,
       ...(auth && { auth }),
     });

@@ -29,7 +29,7 @@ describe("processStop", () => {
     assert.deepEqual(result, {});
     assert.equal(sendNotification.mock.callCount(), 1);
     const params = sendNotification.mock.calls[0].arguments[0];
-    assert.equal(params.title, "[ai-stack\u00b7abcdef] Claude \u5e72\u5b8c\u4e86");
+    assert.equal(params.title, "\ud83c\udfc1 [ai-stack\u00b7abcdef] Claude Code: Done");
     assert.equal(params.message, "Done.");
     assert.deepEqual(params.actions, []);
   });

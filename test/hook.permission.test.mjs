@@ -155,7 +155,8 @@ describe("processHook", () => {
     await processHook(sampleInput, deps);
 
     const callArgs = deps.sendNotification.mock.calls[0].arguments[0];
-    assert.equal(callArgs.title, "Claude Code: Read");
+    // Pending publish prepends the ⏳ state emoji to the (emoji-free) tool title.
+    assert.equal(callArgs.title, "⏳ Claude Code: Read");
     assert.equal(callArgs.message, "/path/to/file.ts");
   });
 
@@ -752,28 +753,28 @@ describe("processHook resolved-notification update", () => {
     assert.equal(args.sequenceId, args.requestId);
   });
 
-  it("updates to ✅ Approved with no actions on allow", async () => {
+  it("updates to ✅ state (no actions) on allow", async () => {
     const deps = depsWith({ approved: true });
     await processHook(input, deps);
     assert.equal(deps.updateNotification.mock.callCount(), 1);
     const u = deps.updateNotification.mock.calls[0].arguments[0];
-    assert.ok(u.title.startsWith("✅ Approved"), `got: ${u.title}`);
+    assert.ok(u.title.startsWith("✅ "), `got: ${u.title}`);
     assert.deepEqual(u.actions, []);
     assert.equal(u.sequenceId, deps.sendNotification.mock.calls[0].arguments[0].requestId);
   });
 
-  it("updates to ❌ Denied on deny", async () => {
+  it("updates to ❌ state on deny", async () => {
     const deps = depsWith({ approved: false });
     await processHook(input, deps);
     assert.equal(deps.updateNotification.mock.callCount(), 1);
-    assert.ok(deps.updateNotification.mock.calls[0].arguments[0].title.startsWith("❌ Denied"));
+    assert.ok(deps.updateNotification.mock.calls[0].arguments[0].title.startsWith("❌ "));
   });
 
-  it("updates to timed-out state on timeout", async () => {
+  it("updates to ⏱️ state on timeout", async () => {
     const deps = depsWith({ timeout: true });
     await processHook(input, deps);
     assert.equal(deps.updateNotification.mock.callCount(), 1);
-    assert.ok(deps.updateNotification.mock.calls[0].arguments[0].title.includes("Timed out"));
+    assert.ok(deps.updateNotification.mock.calls[0].arguments[0].title.startsWith("⏱️ "));
   });
 
   it("no update call when updateNotification is not injected (back-compat)", async () => {
