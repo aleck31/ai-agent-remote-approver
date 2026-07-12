@@ -12,7 +12,7 @@ export const DEFAULT_CONFIG = {
   ntfyServer: "https://ntfy.sh",
   // Balance two conflicting needs: short enough that sitting AT the terminal
   // isn't hijacked for long, yet long enough to read + tap on the phone
-  // (AskUserQuestion especially). 49s is the compromise.
+  // (AskUserQuestion especially). 60s is the compromise.
   timeout: 60,
   planTimeout: 300,
   // Master switch. false → skip the phone entirely and return ASK immediately,

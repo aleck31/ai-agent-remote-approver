@@ -106,7 +106,7 @@ describe("DEFAULT_CONFIG", () => {
     assert.equal(DEFAULT_CONFIG.ntfyServer, "https://ntfy.sh");
   });
 
-  it("should have a moderate default timeout (49s): terminal not hijacked for long, yet enough to tap on the phone", () => {
+  it("should have a moderate default timeout (60s): terminal not hijacked for long, yet enough to tap on the phone", () => {
     assert.equal(DEFAULT_CONFIG.timeout, 60);
   });
 
