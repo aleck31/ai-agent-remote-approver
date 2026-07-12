@@ -10,9 +10,10 @@ export const CONFIG_PATH = path.join(XDG_CONFIG_HOME, "remote-approver", "config
 export const DEFAULT_CONFIG = {
   topic: "",
   ntfyServer: "https://ntfy.sh",
-  // Short by design: when you're AT the terminal, don't get hijacked — if the
-  // phone doesn't answer in a few seconds, fall back to the native CLI prompt.
-  timeout: 15,
+  // Balance two conflicting needs: short enough that sitting AT the terminal
+  // isn't hijacked for long, yet long enough to read + tap on the phone
+  // (AskUserQuestion especially). 49s is the compromise.
+  timeout: 49,
   planTimeout: 300,
   // Master switch. false → skip the phone entirely and return ASK immediately,
   // so permission prompts stay in the terminal (no notification, no waiting).
@@ -53,6 +54,29 @@ export function loadConfig(configPath = CONFIG_PATH) {
 export function saveConfig(config, configPath = CONFIG_PATH) {
   fs.mkdirSync(path.dirname(configPath), { recursive: true });
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2), { mode: 0o600 });
+}
+
+/**
+ * Bring an existing config file up to the current schema by adding any MISSING
+ * default fields — without changing values the user already set. Idempotent.
+ * No-op (and no write) when the file doesn't exist or is already complete.
+ *
+ * @returns {{ added: string[] }} the keys that were filled in
+ */
+export function upgradeConfig(configPath = CONFIG_PATH) {
+  let fileConfig;
+  try {
+    fileConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+  } catch (err) {
+    if (err.code === "ENOENT") return { added: [] };
+    throw err;
+  }
+  const added = Object.keys(DEFAULT_CONFIG).filter((k) => !(k in fileConfig));
+  if (added.length === 0) return { added: [] };
+  const upgraded = { ...fileConfig };
+  for (const k of added) upgraded[k] = DEFAULT_CONFIG[k];
+  saveConfig(upgraded, configPath);
+  return { added };
 }
 
 export function generateTopic() {

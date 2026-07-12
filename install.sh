@@ -37,7 +37,9 @@ HAS_TOPIC=$(node --input-type=module -e "import {loadConfig} from './src/config.
 
 echo ""
 if [ "$HAS_TOPIC" = "yes" ]; then
-  echo "==> Existing config found — registering hooks, keeping your topic"
+  echo "==> Existing config found — upgrading schema (adds missing fields only), keeping your values"
+  node --input-type=module -e "import { upgradeConfig } from './src/config.mjs'; const { added } = upgradeConfig(); console.log(added.length ? 'added: ' + added.join(', ') : 'already up to date');"
+  echo "==> Registering hooks, keeping your topic"
   remote-approver enable
 else
   echo "==> No config yet — initializing (generates a topic + QR)"

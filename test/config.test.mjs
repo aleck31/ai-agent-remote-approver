@@ -26,6 +26,7 @@ import {
   saveConfig,
   generateTopic,
   resolveAuth,
+  upgradeConfig,
 } from "../src/config.mjs";
 
 // ==================== CONFIG_PATH ====================
@@ -49,6 +50,45 @@ describe("CONFIG_PATH", () => {
   });
 });
 
+// ==================== upgradeConfig ====================
+
+describe("upgradeConfig", () => {
+  let tmpDir;
+  before(() => { tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cra-upgrade-")); });
+  after(() => { fs.rmSync(tmpDir, { recursive: true, force: true }); });
+
+  it("adds missing fields without touching existing values", () => {
+    const p = path.join(tmpDir, "old.json");
+    // A stale file: has a user-set timeout, missing 'notify' and others.
+    fs.writeFileSync(p, JSON.stringify({ topic: "keep-me", ntfyServer: "https://x", timeout: 120 }));
+
+    const { added } = upgradeConfig(p);
+
+    assert.ok(added.includes("notify"), "should add the missing notify field");
+    const after = JSON.parse(fs.readFileSync(p, "utf-8"));
+    assert.equal(after.topic, "keep-me", "existing topic preserved");
+    assert.equal(after.timeout, 120, "existing timeout MUST NOT be changed to the new default");
+    assert.equal(after.notify, true, "missing notify filled with default");
+  });
+
+  it("is idempotent: a complete file is left unchanged (no fields added)", () => {
+    const p = path.join(tmpDir, "complete.json");
+    const complete = { ...DEFAULT_CONFIG, topic: "t" };
+    fs.writeFileSync(p, JSON.stringify(complete));
+    const before = fs.readFileSync(p, "utf-8");
+
+    const { added } = upgradeConfig(p);
+
+    assert.deepEqual(added, [], "nothing to add for a complete file");
+    // second run also no-op
+    assert.deepEqual(upgradeConfig(p).added, []);
+  });
+
+  it("no-ops on a missing file", () => {
+    assert.deepEqual(upgradeConfig(path.join(tmpDir, "nope.json")).added, []);
+  });
+});
+
 // ==================== DEFAULT_CONFIG ====================
 
 describe("DEFAULT_CONFIG", () => {
@@ -66,8 +106,8 @@ describe("DEFAULT_CONFIG", () => {
     assert.equal(DEFAULT_CONFIG.ntfyServer, "https://ntfy.sh");
   });
 
-  it("should have a short default timeout (15s) so terminal use isn't hijacked", () => {
-    assert.equal(DEFAULT_CONFIG.timeout, 15);
+  it("should have a moderate default timeout (49s): terminal not hijacked for long, yet enough to tap on the phone", () => {
+    assert.equal(DEFAULT_CONFIG.timeout, 49);
   });
 
   it("should default notify to true (phone notifications on)", () => {
@@ -125,7 +165,7 @@ describe("loadConfig", () => {
     assert.deepEqual(config, {
       topic: "",
       ntfyServer: "https://ntfy.sh",
-      timeout: 15,
+      timeout: 49,
       planTimeout: 300,
       notify: true,
       autoApprove: [],
