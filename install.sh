@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Idempotent installer for remote-approver.
-#   1. npm install + npm link  → puts the `remote-approver` command on $PATH
-#      (so the registered hook uses the stable command, not this repo's path)
+#   1. npm install -g .  → COPIES the package into npm's global prefix and puts
+#      the `remote-approver` command on $PATH. A real install: independent of
+#      this source checkout (you can move/delete the repo afterwards).
 #   2. configures + registers the Claude Code hooks:
 #        - existing config (topic already set) → `enable`        (keeps your topic)
 #        - no config yet                       → `init` + `enable` (generates a topic + QR, then registers)
@@ -10,12 +11,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-echo "==> Installing dependencies and linking the command"
-npm install
-
-# `npm link` writes a symlink into npm's global prefix. If that prefix is a
-# system dir (e.g. /usr), it needs root — point npm at a user-level prefix
-# instead of asking for sudo.
+# Global install needs a writable prefix. If it's a system dir (e.g. /usr),
+# point npm at a user-level prefix instead of asking for sudo.
 if [ ! -w "$(npm prefix -g)/lib/node_modules" ] && [ ! -w "$(npm prefix -g)" ]; then
   echo "npm's global prefix ($(npm prefix -g)) is not writable by this user." >&2
   echo "Set a user-level prefix once, then re-run this script:" >&2
@@ -24,10 +21,17 @@ if [ ! -w "$(npm prefix -g)/lib/node_modules" ] && [ ! -w "$(npm prefix -g)" ]; 
   exit 1
 fi
 
-npm link   # exposes `remote-approver` on $PATH
+echo "==> Installing remote-approver globally (copies the package — no dependency on this checkout)"
+# NOTE: `npm install -g .` on a local DIRECTORY still symlinks back to it (like
+# npm link) — that is a dev setup, not an install. Packing to a tarball first
+# forces a real copy into the global prefix, so this checkout can be moved or
+# deleted afterwards without breaking the installed command.
+TARBALL=$(npm pack --silent | tail -1)
+trap 'rm -f "$TARBALL"' EXIT
+npm install -g "./$TARBALL"
 
 if ! command -v remote-approver >/dev/null 2>&1; then
-  echo "Error: 'remote-approver' is not on \$PATH after npm link." >&2
+  echo "Error: 'remote-approver' is not on \$PATH after npm install -g." >&2
   echo "Ensure your npm global bin dir is on \$PATH, then re-run." >&2
   exit 1
 fi
