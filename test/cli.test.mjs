@@ -58,8 +58,6 @@ function createDeps(overrides = {}) {
     topic: "test-topic-abc",
     ntfyServer: "https://ntfy.sh",
     timeout: 120,
-    autoApprove: [],
-    autoDeny: [],
   };
 
   return {
@@ -320,8 +318,6 @@ describe("main", () => {
         topic: "",
         ntfyServer: "https://ntfy.sh",
         timeout: 120,
-        autoApprove: [],
-        autoDeny: [],
       };
       const deps = createDeps({ config: noTopicConfig, stderr });
 

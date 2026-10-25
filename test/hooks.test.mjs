@@ -51,7 +51,7 @@ describe("runInit", () => {
       saveConfig: (config, configPath) => {
         saveConfigCalledWith = { config, configPath };
       },
-      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, autoApprove: [], autoDeny: [] }),
+      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120 }),
     });
 
     assert.equal(result.topic, generatedTopic);
@@ -70,7 +70,7 @@ describe("runInit", () => {
         savedConfig = config;
         savedPath = configPath;
       },
-      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, autoApprove: [], autoDeny: [] }),
+      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120 }),
     });
 
     assert.ok(savedConfig !== null, "saveConfig should have been called");
@@ -85,7 +85,7 @@ describe("runInit", () => {
       configPath: tmpConfigPath,
       generateTopic: () => "cra-nohookreg1",
       saveConfig: () => {},
-      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, autoApprove: [], autoDeny: [] }),
+      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120 }),
     });
 
     // runInit only writes config; it must not touch settings.json.
@@ -99,7 +99,7 @@ describe("runInit", () => {
       configPath: tmpConfigPath,
       generateTopic: () => generatedTopic,
       saveConfig: () => {},
-      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, autoApprove: [], autoDeny: [] }),
+      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120 }),
     });
 
     assert.equal(typeof result, "object");
@@ -113,7 +113,7 @@ describe("runInit", () => {
       settingsPath: tmpSettingsPath,
       generateTopic: () => "cra-ntfyservertest",
       saveConfig: () => {},
-      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.example.com", timeout: 120, autoApprove: [], autoDeny: [] }),
+      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.example.com", timeout: 120 }),
     });
 
     assert.equal(result.ntfyServer, "https://ntfy.example.com");
@@ -134,7 +134,7 @@ describe("runInit", () => {
       settingsPath: tmpSettingsPath,
       generateTopic: () => "cra-authtest1",
       saveConfig: (config, path) => { savedConfig = config; },
-      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, ntfyUsername: "", ntfyPassword: "", autoApprove: [], autoDeny: [] }),
+      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, ntfyUsername: "", ntfyPassword: "" }),
       prompt: async (question) => promptResponses[promptIdx++],
       promptSecret: async (question) => promptResponses[promptIdx++],
     });
@@ -150,7 +150,7 @@ describe("runInit", () => {
       configPath: tmpConfigPath,
       generateTopic: () => "cra-flagtest",
       saveConfig: (config) => { savedConfig = config; },
-      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, ntfyUsername: "", ntfyPassword: "", autoApprove: [], autoDeny: [] }),
+      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, ntfyUsername: "", ntfyPassword: "" }),
       // no prompt fn → must not block
     }, { server: "https://ntfy.example.com", username: "u", password: "p" });
 
@@ -166,7 +166,7 @@ describe("runInit", () => {
       configPath: tmpConfigPath,
       generateTopic: () => "cra-noflag",
       saveConfig: (config) => { savedConfig = config; },
-      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, ntfyUsername: "", ntfyPassword: "", autoApprove: [], autoDeny: [] }),
+      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, ntfyUsername: "", ntfyPassword: "" }),
     }, { interactive: false });
 
     assert.equal(savedConfig.ntfyServer, "https://ntfy.sh");
@@ -181,7 +181,7 @@ describe("runInit", () => {
       settingsPath: tmpSettingsPath,
       generateTopic: () => "cra-authtest2",
       saveConfig: (config, path) => { savedConfig = config; },
-      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, ntfyUsername: "", ntfyPassword: "", autoApprove: [], autoDeny: [] }),
+      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, ntfyUsername: "", ntfyPassword: "" }),
       // server prompt → blank (keep default), use-auth? → "n"
       prompt: (() => { const r = ["", "n"]; let i = 0; return async () => r[i++]; })(),
     });
@@ -200,7 +200,7 @@ describe("runInit", () => {
       settingsPath: tmpSettingsPath,
       generateTopic: () => "cra-authtest3",
       saveConfig: (config, path) => { savedConfig = config; },
-      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, ntfyUsername: "", ntfyPassword: "", autoApprove: [], autoDeny: [] }),
+      loadConfig: () => ({ topic: "", ntfyServer: "https://ntfy.sh", timeout: 120, ntfyUsername: "", ntfyPassword: "" }),
       prompt: async () => "",
     });
 

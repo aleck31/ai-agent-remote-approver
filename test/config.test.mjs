@@ -114,16 +114,6 @@ describe("DEFAULT_CONFIG", () => {
     assert.equal(DEFAULT_CONFIG.notify, true);
   });
 
-  it("should have autoApprove as an empty array", () => {
-    assert.ok(Array.isArray(DEFAULT_CONFIG.autoApprove), "autoApprove should be an array");
-    assert.equal(DEFAULT_CONFIG.autoApprove.length, 0);
-  });
-
-  it("should have autoDeny as an empty array", () => {
-    assert.ok(Array.isArray(DEFAULT_CONFIG.autoDeny), "autoDeny should be an array");
-    assert.equal(DEFAULT_CONFIG.autoDeny.length, 0);
-  });
-
   it("should have planTimeout as 300", () => {
     assert.equal(DEFAULT_CONFIG.planTimeout, 300);
   });
@@ -169,8 +159,6 @@ describe("loadConfig", () => {
       planTimeout: 300,
       onTimeout: "ask",
       notify: true,
-      autoApprove: [],
-      autoDeny: [],
       ntfyUsername: "",
       ntfyPassword: "",
       notifyOnStop: false,
@@ -189,8 +177,6 @@ describe("loadConfig", () => {
 
     // Default values preserved
     assert.equal(config.ntfyServer, "https://ntfy.sh");
-    assert.deepEqual(config.autoApprove, []);
-    assert.deepEqual(config.autoDeny, []);
   });
 
   it("should return a full config when file contains all fields", () => {
@@ -201,8 +187,6 @@ describe("loadConfig", () => {
       planTimeout: 600,
       onTimeout: "allow",
       notify: true,
-      autoApprove: ["Bash(*)"],
-      autoDeny: ["mcp__*"],
       ntfyUsername: "",
       ntfyPassword: "",
       notifyOnStop: false,
@@ -244,18 +228,6 @@ describe("loadConfig", () => {
     fs.writeFileSync(tmpConfigPath, JSON.stringify({ timeout: -10 }));
     config = loadConfig(tmpConfigPath);
     assert.equal(config.timeout, DEFAULT_CONFIG.timeout);
-  });
-
-  it("should fall back to default autoApprove when autoApprove is not an array", () => {
-    fs.writeFileSync(tmpConfigPath, JSON.stringify({ autoApprove: "Bash(*)" }));
-    const config = loadConfig(tmpConfigPath);
-    assert.deepEqual(config.autoApprove, DEFAULT_CONFIG.autoApprove);
-  });
-
-  it("should fall back to default autoDeny when autoDeny is not an array", () => {
-    fs.writeFileSync(tmpConfigPath, JSON.stringify({ autoDeny: true }));
-    const config = loadConfig(tmpConfigPath);
-    assert.deepEqual(config.autoDeny, DEFAULT_CONFIG.autoDeny);
   });
 
   it("should fall back to default planTimeout when planTimeout is not a positive number", () => {
@@ -317,8 +289,6 @@ describe("saveConfig", () => {
       topic: "save-test",
       ntfyServer: "https://ntfy.sh",
       timeout: 120,
-      autoApprove: [],
-      autoDeny: [],
     };
 
     saveConfig(config, tmpConfigPath);
@@ -346,8 +316,6 @@ describe("saveConfig", () => {
       planTimeout: 180,
       onTimeout: "deny",
       notify: true,
-      autoApprove: ["Read"],
-      autoDeny: ["Bash(rm*)"],
       ntfyUsername: "",
       ntfyPassword: "",
       notifyOnStop: false,

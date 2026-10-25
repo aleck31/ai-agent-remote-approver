@@ -18,8 +18,6 @@ export function createDeps(overrides = {}) {
     ntfyServer: "https://ntfy.sh",
     timeout: 120,
     planTimeout: 300,
-    autoApprove: [],
-    autoDeny: [],
   };
 
   return {

@@ -23,9 +23,6 @@ export const DEFAULT_CONFIG = {
   // Master switch. false → skip the phone entirely and return ASK immediately,
   // so permission prompts stay in the terminal (no notification, no waiting).
   notify: true,
-  // autoApprove/autoDeny are reserved for future use and not yet implemented
-  autoApprove: [],
-  autoDeny: [],
   ntfyUsername: "",
   ntfyPassword: "",
   // When true, a Stop hook sends a one-shot "finished" notification (no buttons).
@@ -42,8 +39,6 @@ export function loadConfig(configPath = CONFIG_PATH) {
     if (!Number.isFinite(config.timeout) || config.timeout <= 0) config.timeout = DEFAULT_CONFIG.timeout;
     if (!Number.isFinite(config.planTimeout) || config.planTimeout <= 0) config.planTimeout = DEFAULT_CONFIG.planTimeout;
     if (!ON_TIMEOUT.includes(config.onTimeout)) config.onTimeout = DEFAULT_CONFIG.onTimeout;
-    if (!Array.isArray(config.autoApprove)) config.autoApprove = DEFAULT_CONFIG.autoApprove;
-    if (!Array.isArray(config.autoDeny)) config.autoDeny = DEFAULT_CONFIG.autoDeny;
     if (typeof config.notify !== "boolean") config.notify = DEFAULT_CONFIG.notify;
     if (typeof config.ntfyUsername !== "string") config.ntfyUsername = DEFAULT_CONFIG.ntfyUsername;
     if (typeof config.ntfyPassword !== "string") config.ntfyPassword = DEFAULT_CONFIG.ntfyPassword;

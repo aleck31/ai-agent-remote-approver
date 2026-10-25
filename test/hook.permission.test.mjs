@@ -75,8 +75,6 @@ describe("processHook", () => {
       topic: "",
       ntfyServer: "https://ntfy.sh",
       timeout: 120,
-      autoApprove: [],
-      autoDeny: [],
     };
     const deps = createDeps({ config: noTopicConfig });
 
@@ -121,8 +119,6 @@ describe("processHook", () => {
       topic: "",
       ntfyServer: "https://ntfy.sh",
       timeout: 120,
-      autoApprove: [],
-      autoDeny: [],
     };
     const deps = createDeps({ config: noTopicConfig });
 
@@ -201,8 +197,6 @@ describe("processHook", () => {
       ntfyServer: "https://ntfy.sh",
       timeout: 300,
       planTimeout: 300,
-      autoApprove: [],
-      autoDeny: [],
     };
     const deps = createDeps({ config: customConfig });
 
@@ -222,8 +216,6 @@ describe("processHook", () => {
       ntfyServer: "https://custom.ntfy.example.com",
       timeout: 120,
       planTimeout: 300,
-      autoApprove: [],
-      autoDeny: [],
     };
     const deps = createDeps({ config: customConfig });
 
@@ -334,8 +326,6 @@ describe("processHook", () => {
       ntfyServer: "https://ntfy.sh",
       timeout: 120,
       planTimeout: 300,
-      autoApprove: [],
-      autoDeny: [],
     };
     const deps = createDeps({ config: customConfig });
     const exitPlanInput = {
@@ -360,8 +350,6 @@ describe("processHook", () => {
       ntfyServer: "https://ntfy.sh",
       timeout: 120,
       planTimeout: 300,
-      autoApprove: [],
-      autoDeny: [],
     };
     const deps = createDeps({ config: customConfig });
 
@@ -380,8 +368,6 @@ describe("processHook", () => {
       topic: "test-topic",
       ntfyServer: "https://ntfy.sh",
       timeout: 120,
-      autoApprove: [],
-      autoDeny: [],
     };
     const deps = createDeps({ config: configWithoutPlanTimeout });
     const exitPlanInput = {
