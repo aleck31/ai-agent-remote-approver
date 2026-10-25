@@ -518,6 +518,7 @@ export const STATUS = Object.freeze({
   deny: "❌",
   answer: "💬",
   timeout: "⏱️",
+  error: "⚠️",
   done: "🏁",
 });
 

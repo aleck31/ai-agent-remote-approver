@@ -520,3 +520,33 @@ describe("processAskUserQuestion", () => {
     }
   });
 });
+
+describe("processAskUserQuestion onTimeout", () => {
+  const input = {
+    tool_name: "AskUserQuestion",
+    tool_input: { questions: [{ question: "Which?", header: "Q", options: [{ label: "A", description: "a" }, { label: "B", description: "b" }], multiSelect: false }] },
+  };
+  const mk = (onTimeout) => ({
+    loadConfig: () => ({ topic: "t", ntfyServer: "https://ntfy.sh", timeout: 5, onTimeout }),
+    sendNotification: mock.fn(async () => ({ ok: true })),
+    updateNotification: mock.fn(async () => {}),
+    waitForResponse: mock.fn(async ({ onReady } = {}) => { if (onReady) await onReady(); return { timeout: true }; }),
+  });
+
+  it("allow: picks the first option", async () => {
+    const deps = mk("allow");
+    const r = await processAskUserQuestion(input, deps);
+    assert.equal(r.hookSpecificOutput.decision.behavior, "allow");
+    assert.deepEqual(r.hookSpecificOutput.decision.updatedInput.answers, { "Which?": "A" });
+  });
+  it("deny: denies", async () => {
+    const r = await processAskUserQuestion(input, mk("deny"));
+    assert.equal(r.hookSpecificOutput.decision.behavior, "deny");
+  });
+  it("ask: falls back to the terminal and resolves the card", async () => {
+    const deps = mk("ask");
+    const r = await processAskUserQuestion(input, deps);
+    assert.equal(r.hookSpecificOutput.decision.behavior, "ask");
+    assert.match(deps.updateNotification.mock.calls[0].arguments[0].title, /^⏱️/);
+  });
+});

@@ -7,6 +7,8 @@ import crypto from "node:crypto";
 const XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
 export const CONFIG_PATH = path.join(XDG_CONFIG_HOME, "remote-approver", "config.json");
 
+export const ON_TIMEOUT = Object.freeze(["ask", "allow", "deny"]);
+
 export const DEFAULT_CONFIG = {
   topic: "",
   ntfyServer: "https://ntfy.sh",
@@ -15,6 +17,9 @@ export const DEFAULT_CONFIG = {
   // (AskUserQuestion especially). 60s is the compromise.
   timeout: 60,
   planTimeout: 300,
+  // What to do when nobody answers on the phone in time: "ask" → fall back to
+  // the terminal prompt; "allow" → auto-approve (first option); "deny" → auto-deny.
+  onTimeout: "ask",
   // Master switch. false → skip the phone entirely and return ASK immediately,
   // so permission prompts stay in the terminal (no notification, no waiting).
   notify: true,
@@ -36,6 +41,7 @@ export function loadConfig(configPath = CONFIG_PATH) {
     if (typeof config.ntfyServer !== "string") config.ntfyServer = DEFAULT_CONFIG.ntfyServer;
     if (!Number.isFinite(config.timeout) || config.timeout <= 0) config.timeout = DEFAULT_CONFIG.timeout;
     if (!Number.isFinite(config.planTimeout) || config.planTimeout <= 0) config.planTimeout = DEFAULT_CONFIG.planTimeout;
+    if (!ON_TIMEOUT.includes(config.onTimeout)) config.onTimeout = DEFAULT_CONFIG.onTimeout;
     if (!Array.isArray(config.autoApprove)) config.autoApprove = DEFAULT_CONFIG.autoApprove;
     if (!Array.isArray(config.autoDeny)) config.autoDeny = DEFAULT_CONFIG.autoDeny;
     if (typeof config.notify !== "boolean") config.notify = DEFAULT_CONFIG.notify;

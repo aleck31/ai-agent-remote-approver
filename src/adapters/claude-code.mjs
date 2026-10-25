@@ -8,6 +8,8 @@ import { buildAuthHeader, sessionTag, formatStopNotification, STATUS, cardBody, 
 
 export const ASK = Object.freeze({ hookSpecificOutput: Object.freeze({ hookEventName: "PermissionRequest", decision: Object.freeze({ behavior: "ask" }) }) });
 const DENY = Object.freeze({ hookSpecificOutput: Object.freeze({ hookEventName: "PermissionRequest", decision: Object.freeze({ behavior: "deny" }) }) });
+/** Auto-deny on timeout carries a reason so Claude knows nobody actively refused. */
+const TIMEOUT_DENY = Object.freeze({ hookSpecificOutput: Object.freeze({ hookEventName: "PermissionRequest", decision: Object.freeze({ behavior: "deny", message: "No response on the phone before the timeout (remote-approver onTimeout=deny)." }) }) });
 const MAX_RETRIES = 3;
 export const RETRY_DELAY_MS = 1000;
 /** Sentinel thrown from an onReady publish so the wait aborts and falls back to CLI. */
@@ -106,7 +108,20 @@ const RESOLVED_EMOJI = Object.freeze({
   deny:    STATUS.deny,
   answer:  STATUS.answer,
   timeout: STATUS.timeout,
+  error:   STATUS.error,
 });
+
+/** Note appended to the resolved card body when the outcome wasn't a phone tap. */
+const AUTO_NOTE = Object.freeze({
+  allow:   "*Timed out — auto-approved*",
+  deny:    "*Timed out — auto-denied*",
+  timeout: "*Timed out — answer in terminal*",
+  error:   "*Listener error — answer in terminal*",
+});
+const withNote = (body, key) => [body, AUTO_NOTE[key]].filter(Boolean).join("\n\n");
+
+/** Validated config.onTimeout: "ask" | "allow" | "deny". */
+const onTimeoutOf = (config) => (["allow", "deny"].includes(config.onTimeout) ? config.onTimeout : "ask");
 
 /**
  * Replace the pending notification with a resolved, button-less one (same
@@ -200,6 +215,13 @@ export async function processAskUserQuestion(input, deps) {
     const requestId = crypto.randomUUID();
     const options = q.options;
     const sub = subtitle(q.header || "Question");
+    // Resolve this question's card; `note` keys AUTO_NOTE (non-tap outcomes), `keptLabel` keeps the picked option.
+    const resolveQ = (outcome, body, note, keptLabel) => sendResolved(deps.updateNotification, {
+      server: config.ntfyServer, topic: config.topic, requestId,
+      tag: qTag, subtitle: sub, body: withNote(body, note), outcome,
+      action: keptLabel ? keptAction(config.ntfyServer, config.topic, requestId, keptLabel, { answer: q.options[0].label }, { ...(auth && { auth }) }) : undefined,
+      ...(auth && { auth }),
+    });
 
     const MAX_BUTTONS = 3;
     const batches = [];
@@ -262,7 +284,20 @@ export async function processAskUserQuestion(input, deps) {
         return ASK;
       }
       console.error("[remote-approver] Response listener failed:", err.message, "— Falling back to CLI.");
+      await resolveQ("error", q.question, "error");
       return ASK;
+    }
+
+    if (response.timeout && onTimeoutOf(config) === "allow") {
+      // Auto-pick the first option.
+      const first = q.options[0].label;
+      answers[q.question] = first;
+      await resolveQ("answer", q.question, "allow", `${STATUS.answer} ${first}`);
+      continue;
+    }
+    if (response.timeout && onTimeoutOf(config) === "deny") {
+      await resolveQ("deny", q.question, "deny");
+      return TIMEOUT_DENY;
     }
 
     if (response.answer) {
@@ -277,6 +312,7 @@ export async function processAskUserQuestion(input, deps) {
       });
     } else {
       console.error("[remote-approver] No answer received. Falling back to CLI.");
+      await resolveQ(response.timeout ? "timeout" : "error", q.question, response.timeout ? "timeout" : "error");
       return ASK;
     }
   }
@@ -376,9 +412,10 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
     always: ka("Always approved ✔", { approved: true, alwaysAllow: true }),
     deny:   ka("Denied ✖", { approved: false }),
   };
-  const resolve = (outcome) => sendResolved(updateNotification, {
+  // `note` keys AUTO_NOTE: set only when the outcome wasn't a phone tap.
+  const resolve = (outcome, note) => sendResolved(updateNotification, {
     server: config.ntfyServer, topic: config.topic, requestId,
-    tag, subtitle, body, outcome, action: KEPT[outcome], ...(auth && { auth }),
+    tag, subtitle, body: withNote(body, note), outcome, action: note ? undefined : KEPT[outcome], ...(auth && { auth }),
   });
 
   // Publish only once the SSE subscription is live (inside onReady), so a fast
@@ -415,18 +452,27 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
   } catch (err) {
     if (err === SEND_FAILED) return ASK;
     console.error("[remote-approver] Response listener failed:", err.message, "— Falling back to CLI.");
-    await resolve("timeout");
+    await resolve("error", "error");
     return ASK;
   }
 
   if (response.timeout) {
-    console.error("[remote-approver] Timed out waiting for response. Falling back to CLI.");
-    await resolve("timeout");
+    const mode = onTimeoutOf(config);
+    console.error(`[remote-approver] Timed out waiting for response (onTimeout=${mode}).`);
+    if (mode === "allow") {
+      await resolve("allow", "allow");
+      return { hookSpecificOutput: { hookEventName: "PermissionRequest", decision: { behavior: "allow" } } };
+    }
+    if (mode === "deny") {
+      await resolve("deny", "deny");
+      return TIMEOUT_DENY;
+    }
+    await resolve("timeout", "timeout");
     return ASK;
   }
   if (response.error) {
     console.error("[remote-approver] Response error:", response.error.message, "— Falling back to CLI.");
-    await resolve("timeout");
+    await resolve("error", "error");
     return ASK;
   }
   if (response.approved === false) {

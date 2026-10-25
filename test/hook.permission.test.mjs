@@ -836,3 +836,45 @@ describe("processHook — subscribe before publish (no lost-tap race)", () => {
     }
   });
 });
+
+// ==================== onTimeout ====================
+
+describe("processHook onTimeout", () => {
+  const input = { tool_name: "Bash", tool_input: { command: "ls" }, session_id: "abcdef123", cwd: "/p/x" };
+  const mk = (onTimeout, wait) => {
+    const deps = createDeps({ config: { topic: "t", ntfyServer: "https://ntfy.sh", timeout: 5, onTimeout } });
+    deps.waitForResponse = mock.fn(async () => wait);
+    deps.updateNotification = mock.fn(async () => {});
+    return deps;
+  };
+  const decisionOf = (r) => r.hookSpecificOutput.decision.behavior;
+
+  it("allow: auto-approves and notes it on the card", async () => {
+    const deps = mk("allow", { timeout: true });
+    assert.equal(decisionOf(await processHook(input, deps)), "allow");
+    const upd = deps.updateNotification.mock.calls[0].arguments[0];
+    assert.match(upd.title, /^✅/);
+    assert.match(upd.message, /auto-approved/);
+  });
+
+  it("deny: auto-denies", async () => {
+    const deps = mk("deny", { timeout: true });
+    assert.equal(decisionOf(await processHook(input, deps)), "deny");
+    assert.match(deps.updateNotification.mock.calls[0].arguments[0].title, /^❌/);
+  });
+
+  it("ask: falls back to the terminal with ⏱️", async () => {
+    const deps = mk("ask", { timeout: true });
+    assert.equal(decisionOf(await processHook(input, deps)), "ask");
+    assert.match(deps.updateNotification.mock.calls[0].arguments[0].title, /^⏱️/);
+  });
+
+  it("listener error is ⚠️ and always asks, regardless of onTimeout", async () => {
+    const deps = mk("allow", { error: new Error("sse down") });
+    const errSpy = mock.method(console, "error", () => {});
+    try {
+      assert.equal(decisionOf(await processHook(input, deps)), "ask");
+    } finally { errSpy.mock.restore(); }
+    assert.match(deps.updateNotification.mock.calls[0].arguments[0].title, /^⚠️/);
+  });
+});

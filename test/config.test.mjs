@@ -167,6 +167,7 @@ describe("loadConfig", () => {
       ntfyServer: "https://ntfy.sh",
       timeout: 60,
       planTimeout: 300,
+      onTimeout: "ask",
       notify: true,
       autoApprove: [],
       autoDeny: [],
@@ -198,6 +199,7 @@ describe("loadConfig", () => {
       ntfyServer: "https://custom.ntfy.example.com",
       timeout: 300,
       planTimeout: 600,
+      onTimeout: "allow",
       notify: true,
       autoApprove: ["Bash(*)"],
       autoDeny: ["mcp__*"],
@@ -209,6 +211,11 @@ describe("loadConfig", () => {
 
     const config = loadConfig(tmpConfigPath);
     assert.deepEqual(config, fullConfig);
+  });
+
+  it("should fall back to onTimeout=ask when onTimeout is invalid", () => {
+    fs.writeFileSync(tmpConfigPath, JSON.stringify({ onTimeout: "yolo" }));
+    assert.equal(loadConfig(tmpConfigPath).onTimeout, "ask");
   });
 
   it("should fall back to default topic when topic is not a string", () => {
@@ -337,6 +344,7 @@ describe("saveConfig", () => {
       ntfyServer: "https://custom.example.com",
       timeout: 90,
       planTimeout: 180,
+      onTimeout: "deny",
       notify: true,
       autoApprove: ["Read"],
       autoDeny: ["Bash(rm*)"],
