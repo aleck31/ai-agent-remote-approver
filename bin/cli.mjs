@@ -3,7 +3,7 @@
 /**
  * CLI entry point for remote-approver.
  *
- * Subcommands: init | enable | disable | test | status | uninstall | hook
+ * Subcommands: init | enable | upgrade | disable | test | status | uninstall | hook
  * All I/O goes through the injected `deps` object so the module is fully testable.
  */
 
@@ -15,7 +15,7 @@ import qrcode from "qrcode-terminal";
 import { ASK } from "../src/adapters/claude-code.mjs";
 
 const USAGE =
-  "Usage: remote-approver <command>\n\nCommands:\n  init        Generate a topic and write config (no hook)\n              flags (non-interactive): --server <url> --user <name> --password <pw> [--no-input]\n  enable      Register the hooks\n  disable     Remove the hooks (keeps config)\n  test        Send a test notification (add --wait to verify the round trip)\n  status      Show current configuration\n  uninstall   Remove hooks and delete configuration\n  hook        Process a Claude Code hook (internal)\n";
+  "Usage: remote-approver <command>\n\nCommands:\n  init        Generate a topic and write config (no hook)\n              flags (non-interactive): --server <url> --user <name> --password <pw> [--no-input]\n  enable      Register the hooks (also adds config fields new in this version)\n  upgrade     Install the latest GitHub release (add --check to only check)\n  disable     Remove the hooks (keeps config)\n  test        Send a test notification (add --wait to verify the round trip)\n  status      Show current configuration\n  uninstall   Remove hooks and delete configuration\n  hook        Process a Claude Code hook (internal)\n";
 
 // ---------------------------------------------------------------------------
 // main
@@ -144,6 +144,7 @@ export async function main(args, deps) {
 
     case "status": {
       const config = deps.loadConfig();
+      deps.stdout.write(`Version: ${deps.version}\n`);
       deps.stdout.write(`Topic:   ${config.topic}\n`);
       deps.stdout.write(`Server:  ${config.ntfyServer}\n`);
       deps.stdout.write(`Timeout: ${config.timeout}s\n`);
@@ -225,7 +226,43 @@ export async function main(args, deps) {
         deps.stderr.write(`Error: Failed to enable hook: ${err.message}\n`);
         break;
       }
+      if (deps.upgradeConfig) {
+        try {
+          const { added } = deps.upgradeConfig(deps.configPath);
+          if (added.length) deps.stdout.write(`Config: added ${added.join(", ")}\n`);
+        } catch (err) {
+          deps.stderr.write(`Warning: Failed to upgrade config: ${err.message}\n`);
+        }
+      }
       deps.stdout.write("Hook enabled.\n");
+      break;
+    }
+
+    case "upgrade": {
+      let latest;
+      try {
+        latest = await deps.fetchLatestRelease();
+      } catch (err) {
+        deps.stderr.write(`Error: Failed to check for updates: ${err.message}\n`);
+        deps.exit(1);
+        break;
+      }
+      if (deps.compareVersions(latest.version, deps.version) <= 0) {
+        deps.stdout.write(`Already up to date (${deps.version}).\n`);
+        break;
+      }
+      deps.stdout.write(`Update available: ${deps.version} -> ${latest.version}\n`);
+      if (args.includes("--check")) break;
+      try {
+        deps.run("npm", ["install", "-g", latest.url]);
+        // The freshly installed binary re-registers hooks and upgrades config; this process still runs old code.
+        if (deps.loadConfig().topic) deps.run("remote-approver", ["enable"]);
+      } catch (err) {
+        deps.stderr.write(`Error: Upgrade failed: ${err.message}\n`);
+        deps.exit(1);
+        break;
+      }
+      deps.stdout.write(`Upgraded to ${latest.version}. Restart running Claude Code sessions.\n`);
       break;
     }
 
@@ -255,9 +292,11 @@ const isMain =
 if (isMain) {
   const pkg = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf-8"));
 
-  const { loadConfig, saveConfig, generateTopic, resolveAuth } = await import(
+  const { loadConfig, saveConfig, upgradeConfig, generateTopic, resolveAuth } = await import(
     "../src/config.mjs"
   );
+  const { fetchLatestRelease, compareVersions } = await import("../src/upgrade.mjs");
+  const { execFileSync } = await import("node:child_process");
   const { sendNotification, waitForResponse, formatToolInfo, buildAuthHeader } = await import(
     "../src/ntfy.mjs"
   );
@@ -279,6 +318,10 @@ if (isMain) {
   const deps = {
     loadConfig,
     saveConfig,
+    upgradeConfig,
+    fetchLatestRelease,
+    compareVersions,
+    run: (cmd, cmdArgs) => execFileSync(cmd, cmdArgs, { stdio: "inherit" }),
     generateTopic,
     resolveAuth,
     sendNotification,

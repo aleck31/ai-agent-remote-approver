@@ -33,12 +33,30 @@ Tailscale, the local HTTP callback server, Windows `SendKeys` keyboard injection
 
 ## Install
 
+Requires Node ≥ 18. Not published to npm — installed from GitHub releases.
+
 ```bash
-cd ai-agent-remote-approver
-npm install
-npm test           # node --test, split across test/*.test.mjs
-npm link           # optional: exposes the `remote-approver` command globally
+curl -fsSL https://raw.githubusercontent.com/aleck31/ai-agent-remote-approver/main/install.sh | bash
 ```
+
+This installs the latest release globally, runs `init` if there is no config yet, and registers the hooks (`enable`). From a checkout, `./install.sh` does the same using the local source (real copy via `npm pack`, not a symlink). For development: `npm install && npm test && npm link`.
+
+## Upgrade
+
+```bash
+remote-approver upgrade           # install the latest release, re-register hooks, add new config fields
+remote-approver upgrade --check   # only report whether a newer release exists
+```
+
+Your topic and existing config values are kept; only missing fields are added. Restart running Claude Code sessions afterwards. Re-running the `curl … | bash` installer is equivalent.
+
+## Releasing (maintainers)
+
+```bash
+scripts/release.sh patch   # or minor | major | X.Y.Z — tests, bumps, tags, pushes
+```
+
+Pushing the `vX.Y.Z` tag triggers `.github/workflows/release.yml`, which tests, packs, and publishes `remote-approver.tgz` as a GitHub release asset.
 
 ## Quick start (public ntfy.sh)
 
@@ -55,7 +73,7 @@ remote-approver init --server https://ntfy.example.com --user alex --password '�
 # or --no-input to take all defaults (public ntfy.sh, no auth)
 ```
 
-(`./install.sh` does init + enable, plus `npm link`.) Scan the QR in the ntfy Android app, then use Claude Code normally. When Claude wants a permission, your phone buzzes with Approve/Deny buttons.
+Scan the QR in the ntfy Android app, then use Claude Code normally. When Claude wants a permission, your phone buzzes with Approve/Deny buttons.
 
 Config lives at `~/.config/remote-approver/config.json`:
 
