@@ -71,7 +71,7 @@ function parseResponseLine(line, requestId) {
  * @param {{ server: string, topic: string, requestId: string, timeout: number, onReady?: () => (void | Promise<void>) }} params
  * @returns {Promise<{ approved: boolean } | { timeout: true } | { error: Error } | { answer: string }>}
  */
-export async function waitForResponse({ server, topic, requestId, timeout, auth, onReady }) {
+export async function waitForResponse({ server, topic, requestId, timeout, auth, onReady, signal }) {
   const baseUrl = server.replace(/\/+$/, '');
   const url = `${baseUrl}/${topic}-response/json`;
 
@@ -86,6 +86,11 @@ export async function waitForResponse({ server, topic, requestId, timeout, auth,
   // reported as a clean timeout — real fetch wraps the abort as "fetch failed"
   // (not a bare AbortError), which would otherwise look like a network error.
   let timedOut = false;
+  // Set when the caller's `signal` aborted us (e.g. the terminal answered first).
+  let cancelled = false;
+  const onCallerAbort = () => { cancelled = true; controller.abort(); };
+  if (signal?.aborted) return { cancelled: true };
+  signal?.addEventListener('abort', onCallerAbort, { once: true });
 
   try {
     const authHeaders = auth ? buildAuthHeader(auth) : undefined;
@@ -145,15 +150,18 @@ export async function waitForResponse({ server, topic, requestId, timeout, auth,
     }
 
     clearTimeout(timer);
-    return { timeout: true };
+    return cancelled ? { cancelled: true } : { timeout: true };
   } catch (err) {
     if (timer !== undefined) clearTimeout(timer);
     if (err === onReadyError) throw err; // caller's publish failed — let them handle it
+    if (cancelled) return { cancelled: true };
     if (timedOut || err?.name === "AbortError") {
       return { timeout: true };
     }
     console.error("[remote-approver] waitForResponse error:", err.message ?? err);
     return { error: err };
+  } finally {
+    signal?.removeEventListener('abort', onCallerAbort);
   }
 }
 
@@ -519,6 +527,7 @@ export const STATUS = Object.freeze({
   answer: "💬",
   timeout: "⏱️",
   error: "⚠️",
+  terminal: "🖥️",
   done: "🏁",
 });
 

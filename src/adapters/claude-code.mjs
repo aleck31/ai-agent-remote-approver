@@ -4,6 +4,7 @@
 
 import crypto from "node:crypto";
 import { DEFAULT_CONFIG } from "../config.mjs";
+import { watchTerminalAnswer } from "../terminal-watch.mjs";
 import { buildAuthHeader, sessionTag, formatStopNotification, STATUS, cardBody, subtitle } from "../ntfy.mjs";
 
 export const ASK = Object.freeze({ hookSpecificOutput: Object.freeze({ hookEventName: "PermissionRequest", decision: Object.freeze({ behavior: "ask" }) }) });
@@ -109,6 +110,7 @@ const RESOLVED_EMOJI = Object.freeze({
   answer:  STATUS.answer,
   timeout: STATUS.timeout,
   error:   STATUS.error,
+  terminal: STATUS.terminal,
 });
 
 /** Note appended to the resolved card body when the outcome wasn't a phone tap. */
@@ -117,8 +119,30 @@ const AUTO_NOTE = Object.freeze({
   deny:    "*Timed out — auto-denied*",
   timeout: "*Timed out — answer in terminal*",
   error:   "*Listener error — answer in terminal*",
+  terminal: "*Answered in terminal*",
 });
 const withNote = (body, key) => [body, AUTO_NOTE[key]].filter(Boolean).join("\n\n");
+
+/**
+ * Run `wait(signal)` (the phone wait) while watching the transcript for the
+ * terminal answering first; resolves { terminal: true } if it did, else wait's result.
+ */
+async function waitUnlessTerminal(input, watchTerminal, wait) {
+  const ac = new AbortController();
+  let terminal = false;
+  const watcher = input.transcript_path
+    ? (watchTerminal ?? watchTerminalAnswer)({
+        transcriptPath: input.transcript_path, toolName: input.tool_name, toolInput: input.tool_input, signal: ac.signal,
+      }).then((seen) => { if (seen) { terminal = true; ac.abort(); } }, () => {})
+    : null;
+  try {
+    const response = await wait(ac.signal);
+    return terminal ? { terminal: true } : response;
+  } finally {
+    ac.abort();
+    await watcher;
+  }
+}
 
 /** Validated config.onTimeout: "ask" | "allow" | "deny". */
 const onTimeoutOf = (config) => (["allow", "deny"].includes(config.onTimeout) ? config.onTimeout : "ask");
@@ -262,14 +286,15 @@ export async function processAskUserQuestion(input, deps) {
     // AskUserQuestion uses standard timeout (not planTimeout)
     let response;
     try {
-      response = await deps.waitForResponse({
+      response = await waitUnlessTerminal(input, deps.watchTerminal, (signal) => deps.waitForResponse({
         server: config.ntfyServer,
         topic: config.topic,
         requestId,
         timeout: config.timeout * 1000,
         onReady: publish,
+        signal,
         ...(auth && { auth }),
-      });
+      }));
     } catch (err) {
       if (err === SEND_FAILED) {
         // A later batch failed after an earlier one already reached the phone:
@@ -288,6 +313,10 @@ export async function processAskUserQuestion(input, deps) {
       return ASK;
     }
 
+    if (response.terminal) {
+      await resolveQ("terminal", q.question, "terminal");
+      return ASK;
+    }
     if (response.timeout && onTimeoutOf(config) === "allow") {
       // Auto-pick the first option.
       const first = q.options[0].label;
@@ -373,7 +402,7 @@ export async function processStop(input, config, { sendNotification, resolveAuth
  * @param {Function} deps.formatToolInfo
  * @returns {Promise<object>} Decision JSON
  */
-export async function processHook(input, { loadConfig, sendNotification, waitForResponse, formatToolInfo, resolveAuth, updateNotification }) {
+export async function processHook(input, { loadConfig, sendNotification, waitForResponse, formatToolInfo, resolveAuth, updateNotification, watchTerminal }) {
   const config = loadConfig();
 
   if (input?.hook_event_name === "Stop") {
@@ -393,7 +422,7 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
   const auth = resolveAuth ? resolveAuth(config) : null;
 
   if (isAskUserQuestion(input)) {
-    return processAskUserQuestion(input, { loadConfig, sendNotification, waitForResponse, resolveAuth, updateNotification });
+    return processAskUserQuestion(input, { loadConfig, sendNotification, waitForResponse, resolveAuth, updateNotification, watchTerminal });
   }
 
   const requestId = crypto.randomUUID();
@@ -441,14 +470,15 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
   try {
     const isPlanReview = input.tool_name === "ExitPlanMode";
     const timeout = (isPlanReview ? (config.planTimeout ?? DEFAULT_CONFIG.planTimeout) : config.timeout) * 1000;
-    response = await waitForResponse({
+    response = await waitUnlessTerminal(input, watchTerminal, (signal) => waitForResponse({
       server: config.ntfyServer,
       topic: config.topic,
       requestId,
       timeout,
       onReady: publish,
+      signal,
       ...(auth && { auth }),
-    });
+    }));
   } catch (err) {
     if (err === SEND_FAILED) return ASK;
     console.error("[remote-approver] Response listener failed:", err.message, "— Falling back to CLI.");
@@ -456,6 +486,10 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
     return ASK;
   }
 
+  if (response.terminal) {
+    await resolve("terminal", "terminal");
+    return ASK;
+  }
   if (response.timeout) {
     const mode = onTimeoutOf(config);
     console.error(`[remote-approver] Timed out waiting for response (onTimeout=${mode}).`);
