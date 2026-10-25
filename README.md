@@ -22,14 +22,15 @@ Tailscale, the local HTTP callback server, Windows `SendKeys` keyboard injection
 ## Features
 
 - **Approve / Deny / Always-Approve** (Always-Approve writes back `updatedPermissions`).
-- **One status emoji per card** — the title leads with the state: ❓ pending · ✅ approved · ❌ denied · 💬 answered · ⏱️ timed out → CLI · 🏁 turn finished.
+- **One status emoji per card** — the title leads with the state: ❓ pending · ✅ approved · ❌ denied · 💬 answered · ⏱️ timed out → CLI · ⚠️ listener error → CLI · 🖥️ answered in terminal · 🏁 turn finished.
 - **Notification resolves in place** — after you tap, the pending prompt is *replaced* (via ntfy `sequence_id`): the title emoji flips to the outcome and only the chosen button is kept (`Approved ✔` / `Denied ✖` / the picked option). No "both buttons ticked" confusion; the decision stays in history.
+- **Terminal-first answers are noticed** — if you answer the prompt in the terminal before the phone, the pending card is flipped to 🖥️ *Answered in terminal* (detected by watching the session transcript, since Claude Code neither signals nor kills a running hook).
 - **Distinguish concurrent sessions**: each title carries a `[project·sessionid]` tag (project = basename of `cwd`, sessionid = first 6 chars of `session_id`), so multiple sessions are told apart. Routing is isolated per request via a random `requestId`; the tag is just visual.
 - **AskUserQuestion** — option buttons on your phone (auto-batched into groups of 3, ntfy's action limit; multiple questions asked one card at a time).
 - **Plan review** (`ExitPlanMode`) with a longer, separate timeout.
 - **Rich previews** in a markdown card (`Claude Code: \`<tool>\`` subtitle + rule + preview): Bash (description + fenced command), Edit (fenced diff), Write (line count), Read/Glob/Grep/WebFetch/WebSearch/Task.
 - **Self-hosted ntfy + Basic auth.**
-- **Retry with backoff**, and **timeout → CLI fallback**.
+- **Retry with backoff**, and a configurable **timeout action** (`onTimeout`: terminal / auto-approve / auto-deny).
 
 ## Install
 
@@ -84,6 +85,7 @@ Config lives at `~/.config/remote-approver/config.json`:
   "notify": true,
   "timeout": 60,
   "planTimeout": 300,
+  "onTimeout": "ask",
   "ntfyUsername": "",
   "ntfyPassword": "",
   "notifyOnStop": false
@@ -95,7 +97,9 @@ Config lives at `~/.config/remote-approver/config.json`:
 The permission prompt is a **blocking** hook: while it waits for your phone, the terminal can't show its own prompt. Two settings keep this from hijacking you when you're at the keyboard:
 
 - **`notify`** (default `true`) — set to `false` to skip the phone entirely: prompts stay in the terminal, nothing is published, no waiting. Flip it back to `true` when you step away. No re-`enable` needed.
+- **Auto mode** — in Claude Code's auto permission mode the prompt is auto-approved before any hook runs, so this tool is bypassed by design.
 - **`timeout`** (default `60`s) — how long to wait for a phone tap before falling back to the terminal prompt. Lower it if you're usually at the keyboard; raise it if usually away.
+- **`onTimeout`** (default `"ask"`) — what happens when the timeout expires: `"ask"` falls back to the terminal prompt (blocks until you return); `"allow"` auto-approves (the first option; for `AskUserQuestion`, the first choice) so unattended long runs aren't stalled; `"deny"` auto-denies, telling Claude it timed out. The card is updated to say which happened. Listener/network errors always fall back to the terminal (⚠️ card), whatever this is set to.
 
 ### Completion notifications (opt-in)
 
@@ -112,6 +116,7 @@ Set `"notifyOnStop": true` to get a one-shot push when Claude finishes a turn �
 | `notify` | `true` | Master switch. `false` → keep prompts in the terminal: don't publish or wait on the phone. |
 | `timeout` | `60` | Seconds to wait for a phone tap before falling back to the CLI prompt. A compromise between not stalling terminal use and leaving time to tap on the phone. |
 | `planTimeout` | `300` | Longer timeout for `ExitPlanMode` (plan review). |
+| `onTimeout` | `ask` | `ask` / `allow` / `deny` — what to do when nobody answers in time (see above). |
 | `ntfyUsername` / `ntfyPassword` | `""` | Basic-auth for a private (`deny-all`) server. Env `NTFY_USERNAME` / `NTFY_PASSWORD` override the file. |
 | `notifyOnStop` | `false` | Send the one-shot "finished" push on `Stop`. |
 

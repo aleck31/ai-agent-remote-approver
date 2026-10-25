@@ -32,6 +32,7 @@ Claude Code ──spawn──▶ node bin/cli.mjs hook          (per event, stdi
 | `src/ntfy.mjs` | Agent-agnostic ntfy core: `sendNotification`, `waitForResponse` (SSE), `formatToolInfo`/`formatToolPreview`, `sessionTag`, `formatStopNotification`, `stripMarkdown`, `PRIORITY`. |
 | `src/config.mjs` | Load/validate/save config (single XDG path); `generateTopic`; `resolveAuth`. |
 | `src/upgrade.mjs` | GitHub-release lookup for `upgrade`: `fetchLatestRelease` (API `releases/latest`), `compareVersions`, `assetUrl` (`remote-approver.tgz` asset). `upgrade` runs `npm install -g <asset>` then the NEW binary's `enable` (which also runs `upgradeConfig`). |
+| `src/terminal-watch.mjs` | `watchTerminalAnswer`: polls the session transcript (`transcript_path`) for the `tool_result` of the pending call (matched by tool name + input; the hook input has no `tool_use_id`). Claude Code does not signal or kill a hook whose terminal dialog was answered first, so this is the only cue. |
 | `src/hooks.mjs` | Register/unregister hooks in settings.json (`PermissionRequest` + `Stop`); `getHookCommand` (stable global command, else absolute-path fallback); `runInit` (config-only, no hook). |
 | `test/*.test.mjs` | Node built-in test runner; shared mocks in `test/helpers.mjs`. |
 
@@ -50,8 +51,10 @@ Claude Code ──spawn──▶ node bin/cli.mjs hook          (per event, stdi
      - `approved === false` → `DENY`
      - `alwaysAllow === true` (+ suggestions) → `allow` with `updatedPermissions`
      - else → `allow`
-     - timeout / error → `ASK` (safe fallback)
+     - timeout → per `config.onTimeout`: `ask` → `ASK` (default), `allow` → allow, `deny` → deny with a reason message (`AskUserQuestion`: `allow` picks the first option); the card notes it was automatic
+     - listener error → `ASK` regardless of `onTimeout`; card shows ⚠️
    - `sendResolved(...)` publishes a same-`sequenceId` update: button-less, low priority, title `✅/❌/💬/⏱️ · <original>` — flips the phone notification from *pending* to *resolved* while preserving history.
+   - The phone wait runs alongside `watchTerminalAnswer`; if the terminal answers first the wait is aborted (`waitForResponse` `signal` → `{ cancelled }`), the card flips to 🖥️ and the hook returns `ASK` (ignored by Claude Code).
    - Return the decision as `{ hookSpecificOutput: { hookEventName: "PermissionRequest", decision } }`.
 
 ## Why concurrent sessions don't cross
