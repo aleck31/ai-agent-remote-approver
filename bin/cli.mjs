@@ -307,7 +307,8 @@ if (isMain) {
   const args = process.argv.slice(2);
 
   let stdinData = "";
-  if (!process.stdin.isTTY) {
+  // Only `hook` consumes stdin; reading it for other commands would hang on an open pipe.
+  if (args[0] === "hook" && !process.stdin.isTTY) {
     const chunks = [];
     for await (const chunk of process.stdin) {
       chunks.push(chunk);
