@@ -689,3 +689,17 @@ describe("unregisterHook", () => {
     assert.equal(settings.hooks, undefined, "hooks key should be removed after clearing legacy flat entry");
   });
 });
+
+describe("settings.json formatting", () => {
+  it("registerHook / unregisterHook keep a trailing newline", async () => {
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const path = await import("node:path");
+    const { registerHook, unregisterHook } = await import("../src/hooks.mjs");
+    const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "st-")), "settings.json");
+    registerHook(f, "remote-approver hook");
+    assert.ok(fs.readFileSync(f, "utf-8").endsWith("}\n"));
+    unregisterHook(f);
+    assert.ok(fs.readFileSync(f, "utf-8").endsWith("}\n"));
+  });
+});

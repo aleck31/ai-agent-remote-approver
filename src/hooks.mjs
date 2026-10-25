@@ -85,7 +85,7 @@ function registerForEvent(settingsPath, event, hookCommand) {
     settings.hooks[event].push(hookEntry);
   }
 
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
 }
 
 /**
@@ -117,7 +117,7 @@ function unregisterForEvent(settingsPath, event) {
     delete settings.hooks;
   }
 
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
 }
 
 /**
