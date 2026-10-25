@@ -196,7 +196,7 @@ describe("processAskUserQuestion", () => {
       assert.equal(deps.updateNotification.mock.callCount(), 1, "should resolve the lingering pending card exactly once");
       const u = deps.updateNotification.mock.calls[0].arguments[0];
       assert.deepEqual(u.actions, [], "resolved card is button-less");
-      assert.ok(u.title.startsWith("⏱️"), `resolved as timeout, got: ${u.title}`);
+      assert.ok(u.title.startsWith("⏸️"), `resolved as timeout, got: ${u.title}`);
     } finally {
       _internal.delay = originalDelay;
     }
@@ -538,6 +538,7 @@ describe("processAskUserQuestion onTimeout", () => {
     const r = await processAskUserQuestion(input, deps);
     assert.equal(r.hookSpecificOutput.decision.behavior, "allow");
     assert.deepEqual(r.hookSpecificOutput.decision.updatedInput.answers, { "Which?": "A" });
+    assert.match(deps.updateNotification.mock.calls[0].arguments[0].title, /^⏱️ 自动批准/);
   });
   it("deny: denies", async () => {
     const r = await processAskUserQuestion(input, mk("deny"));
@@ -547,6 +548,6 @@ describe("processAskUserQuestion onTimeout", () => {
     const deps = mk("ask");
     const r = await processAskUserQuestion(input, deps);
     assert.equal(r.hookSpecificOutput.decision.behavior, "ask");
-    assert.match(deps.updateNotification.mock.calls[0].arguments[0].title, /^⏱️/);
+    assert.match(deps.updateNotification.mock.calls[0].arguments[0].title, /^⏸️ 回终端/);
   });
 });

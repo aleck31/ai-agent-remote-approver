@@ -511,25 +511,43 @@ function stripInline(text) {
 export const PRIORITY = Object.freeze({ min: 1, low: 2, default: 3, high: 4, urgent: 5 });
 
 /**
- * Title-leading emoji conveys STATE only (not tool type — the tool name is in
- * the title text). One emoji per state, placed at the start of the title.
- *   pending    needs your attention
- *   allow      approved
- *   deny       denied
- *   answer     answered (AskUserQuestion)
- *   timeout    not handled in time → fell back to CLI
- *   done       a turn finished (Stop notification)
+ * Visual language: colour intensity tracks how much a card needs you.
+ *   A  act now       pending                  ❓ red       — the only card with buttons; priority high
+ *   B  come back     timeout, error, done     ⏸️ ⚠️ 🏁     — agent is waiting on you at the terminal / idle
+ *   C  FYI / record  allow, deny, answer,     ✔️ ✖️ 💬 🖥️ ⏱️ — grey family, silent (low); saturated green/red are
+ *                    terminal, autoAllow/Deny                  reserved for the Approve/Deny buttons
+ * One emoji per card, leading the title; the label says what it means.
  */
 export const STATUS = Object.freeze({
   pending: "❓",
-  allow: "✅",
-  deny: "❌",
+  allow: "✔️",
+  deny: "✖️",
   answer: "💬",
-  timeout: "⏱️",
+  timeout: "⏸️",
   error: "⚠️",
   terminal: "🖥️",
   done: "🏁",
+  autoAllow: "⏱️",
+  autoDeny: "⏱️",
 });
+
+export const STATUS_LABEL = Object.freeze({
+  pending: "待操作",
+  allow: "已批准",
+  deny: "已拒绝",
+  answer: "已回答",
+  timeout: "回终端",
+  error: "出错·回终端",
+  terminal: "终端已答",
+  done: "完成",
+  autoAllow: "自动批准",
+  autoDeny: "自动拒绝",
+});
+
+/** Card title: `<emoji> <label> [proj·sid]` (tag omitted when empty). */
+export function statusTitle(key, tag) {
+  return `${STATUS[key]} ${STATUS_LABEL[key]}${tag ? ` [${tag}]` : ""}`;
+}
 
 /**
  * The single source of the card subtitle format. `kind` (a tool name, "Plan
@@ -544,15 +562,15 @@ export function subtitle(kind) {
 
 /**
  * Build a card's message body: the subtitle heading (kept out of the plain-text
- * title, which only holds the state emoji + [proj·sid]), a horizontal rule, then
- * the body. The `####` + `---` render as a small heading and a separator line in
- * ntfy's markdown, giving the flat title/body a clear layout.
+ * title, which only holds the state emoji + label + [proj·sid]), then the body. The
+ * `#####` renders as a small heading in ntfy's markdown; no horizontal rule, since
+ * it reads as a separator between two messages.
  *
  * @param {string} subtitleText - e.g. subtitle("Bash")
  * @param {string} body - the preview/detail (may contain markdown)
  */
 export function cardBody(subtitleText, body) {
-  return `##### ${subtitleText}\n---\n${body}`;
+  return `##### ${subtitleText}\n${body}`;
 }
 
 const PREVIEW_MAX_LENGTH = 1000;
@@ -728,9 +746,9 @@ export function formatStopNotification({ cwd, session_id, last_assistant_message
   // markdown message. markdown:true so the #### subtitle / --- rule render (msg
   // itself is already markdown-stripped plain text, safe inside the card).
   return {
-    title: `${STATUS.done}${tag ? ` [${tag}]` : ""}`,
+    title: statusTitle("done", tag),
     message: cardBody(subtitle("Done"), clip(msg, 400)),
-    priority: PRIORITY.default,
+    priority: PRIORITY.low,
     markdown: true,
   };
 }
@@ -742,7 +760,7 @@ export function formatStopNotification({ cwd, session_id, last_assistant_message
  * The title is prefixed with a [project·sessionid] tag (when the hook input
  * carries cwd/session_id) so multiple concurrent sessions are distinguishable.
  * ExitPlanMode is treated specially: its plan text is markdown-stripped and
- * shown at default priority.
+ * shown at high priority (it needs an answer).
  *
  * @param {{ hook_event_name: string, tool_name: string, tool_input: Record<string, unknown>, cwd?: string, session_id?: string }} params
  * @returns {{ title: string, message: string, priority: number, tags: string[], markdown: boolean }}
@@ -759,7 +777,7 @@ export function formatToolInfo({ hook_event_name, tool_name, tool_input, cwd, se
     const plain = tool_input.plan.trim() ? stripMarkdown(tool_input.plan) : '';
     const body = clip(plain || '(empty plan)', PREVIEW_MAX_LENGTH);
     const sub = subtitle("Plan Review");
-    return { title, tag, subtitle: sub, body, message: cardBody(sub, body), priority: PRIORITY.default, markdown: true };
+    return { title, tag, subtitle: sub, body, message: cardBody(sub, body), priority: PRIORITY.high, markdown: true };
   }
 
   const { message, priority } = formatToolPreview(tool_name, tool_input);

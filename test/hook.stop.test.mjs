@@ -29,8 +29,8 @@ describe("processStop", () => {
     assert.deepEqual(result, {});
     assert.equal(sendNotification.mock.callCount(), 1);
     const params = sendNotification.mock.calls[0].arguments[0];
-    assert.equal(params.title, "\ud83c\udfc1 [ai-stack\u00b7abcdef]");
-    assert.equal(params.message, "##### Claude Code: `Done`\n---\nDone.");
+    assert.equal(params.title, "\ud83c\udfc1 完成 [ai-stack\u00b7abcdef]");
+    assert.equal(params.message, "##### Claude Code: `Done`\nDone.");
     assert.deepEqual(params.actions, []);
   });
 

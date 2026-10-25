@@ -5,7 +5,7 @@
 import crypto from "node:crypto";
 import { DEFAULT_CONFIG } from "../config.mjs";
 import { watchTerminalAnswer } from "../terminal-watch.mjs";
-import { buildAuthHeader, sessionTag, formatStopNotification, STATUS, cardBody, subtitle } from "../ntfy.mjs";
+import { buildAuthHeader, sessionTag, formatStopNotification, STATUS, PRIORITY, statusTitle, cardBody, subtitle } from "../ntfy.mjs";
 
 export const ASK = Object.freeze({ hookSpecificOutput: Object.freeze({ hookEventName: "PermissionRequest", decision: Object.freeze({ behavior: "ask" }) }) });
 const DENY = Object.freeze({ hookSpecificOutput: Object.freeze({ hookEventName: "PermissionRequest", decision: Object.freeze({ behavior: "deny" }) }) });
@@ -34,7 +34,7 @@ export function buildActions(server, topic, requestId, { permissionSuggestions, 
   const actions = [
     {
       action: "http",
-      label: "Approve",
+      label: "✅ Approve",
       url,
       body: JSON.stringify({ requestId, approved: true }),
       method: "POST",
@@ -42,7 +42,7 @@ export function buildActions(server, topic, requestId, { permissionSuggestions, 
     },
     {
       action: "http",
-      label: "Deny",
+      label: "❌ Deny",
       url,
       body: JSON.stringify({ requestId, approved: false }),
       method: "POST",
@@ -52,7 +52,7 @@ export function buildActions(server, topic, requestId, { permissionSuggestions, 
   if (permissionSuggestions?.length > 0) {
     actions.splice(1, 0, {
       action: "http",
-      label: "Always Approve",
+      label: "✅ Always Approve",
       url,
       body: JSON.stringify({ requestId, approved: true, alwaysAllow: true }),
       method: "POST",
@@ -98,20 +98,14 @@ export async function sendWithRetry(sendFn, params) {
   return null;
 }
 
-/**
- * Resolved-outcome → state emoji (STATUS). The emoji alone conveys the outcome;
- * no redundant "Approved"/"Denied" word in the title. `always` reuses the allow
- * emoji (it's still an approval).
- */
-const RESOLVED_EMOJI = Object.freeze({
-  allow:   STATUS.allow,
-  always:  STATUS.allow,
-  deny:    STATUS.deny,
-  answer:  STATUS.answer,
-  timeout: STATUS.timeout,
-  error:   STATUS.error,
-  terminal: STATUS.terminal,
+/** Resolved-outcome → STATUS key (emoji + label in the title). `always` reuses allow (still an approval). */
+const RESOLVED_STATUS = Object.freeze({
+  allow: "allow", always: "allow", deny: "deny", answer: "answer",
+  timeout: "timeout", error: "error", terminal: "terminal",
+  autoAllow: "autoAllow", autoDeny: "autoDeny",
 });
+/** B-layer outcomes (agent waits on you at the terminal) get default priority; the rest are silent FYI. */
+const RESOLVED_PRIORITY = (outcome) => (["timeout", "error"].includes(outcome) ? PRIORITY.default : PRIORITY.low);
 
 /** Note appended to the resolved card body when the outcome wasn't a phone tap. */
 const AUTO_NOTE = Object.freeze({
@@ -156,7 +150,6 @@ const onTimeoutOf = (config) => (["allow", "deny"].includes(config.onTimeout) ? 
  */
 async function sendResolved(updateNotification, { server, topic, requestId, tag, subtitle, body, outcome, action, auth }) {
   if (!updateNotification) return;
-  const emoji = RESOLVED_EMOJI[outcome] || STATUS.timeout;
   try {
     await updateNotification({
       server,
@@ -164,14 +157,14 @@ async function sendResolved(updateNotification, { server, topic, requestId, tag,
       sequenceId: requestId,
       requestId,
       // Title: state emoji + [proj·sid]. Subtitle + body live in the markdown card.
-      title: `${emoji}${tag ? ` [${tag}]` : ""}`,
+      title: statusTitle(RESOLVED_STATUS[outcome] || "timeout", tag),
       message: cardBody(subtitle, body),
       // Keep ONLY the chosen action (the picked option / Approve|Deny); drop the
       // rest. It stays tappable (ntfy has no disabled button) but re-tapping just
       // repeats the same answer to a topic nobody's listening on — harmless, and
       // it shows in the actions area what you chose. Timeout keeps no button.
       actions: action ? [action] : [],
-      priority: 2,
+      priority: RESOLVED_PRIORITY(outcome),
       markdown: true,
       ...(auth && { auth }),
     });
@@ -233,7 +226,6 @@ export async function processAskUserQuestion(input, deps) {
   const questions = input.tool_input.questions;
   const answers = {};
   const qTag = sessionTag(input);
-  const qTitle = qTag ? `[${qTag}]` : "";
 
   for (const q of questions) {
     const requestId = crypto.randomUUID();
@@ -269,7 +261,7 @@ export async function processAskUserQuestion(input, deps) {
         const sent = await sendWithRetry(deps.sendNotification, {
           server: config.ntfyServer,
           topic: config.topic,
-          title: `${STATUS.pending}${qTitle ? ` ${qTitle}` : ""}`,
+          title: statusTitle("pending", qTag),
           message: cardBody(sub, body),
           actions,
           requestId,
@@ -321,11 +313,11 @@ export async function processAskUserQuestion(input, deps) {
       // Auto-pick the first option.
       const first = q.options[0].label;
       answers[q.question] = first;
-      await resolveQ("answer", q.question, "allow", `${STATUS.answer} ${first}`);
+      await resolveQ("autoAllow", q.question, "allow", `${STATUS.answer} ${first}`);
       continue;
     }
     if (response.timeout && onTimeoutOf(config) === "deny") {
-      await resolveQ("deny", q.question, "deny");
+      await resolveQ("autoDeny", q.question, "deny");
       return TIMEOUT_DENY;
     }
 
@@ -454,7 +446,7 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
     const sent = await sendWithRetry(sendNotification, {
       server: config.ntfyServer,
       topic: config.topic,
-      title: `${STATUS.pending} ${title}`,
+      title: statusTitle("pending", tag),
       message,
       actions,
       requestId,
@@ -494,11 +486,11 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
     const mode = onTimeoutOf(config);
     console.error(`[remote-approver] Timed out waiting for response (onTimeout=${mode}).`);
     if (mode === "allow") {
-      await resolve("allow", "allow");
+      await resolve("autoAllow", "allow");
       return { hookSpecificOutput: { hookEventName: "PermissionRequest", decision: { behavior: "allow" } } };
     }
     if (mode === "deny") {
-      await resolve("deny", "deny");
+      await resolve("autoDeny", "deny");
       return TIMEOUT_DENY;
     }
     await resolve("timeout", "timeout");

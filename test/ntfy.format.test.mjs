@@ -399,7 +399,7 @@ describe("formatToolInfo (rich enrichment)", () => {
     assert.ok(result.message.includes("3 lines"));
   });
 
-  it("should use default priority and no tags for Plan Review", () => {
+  it("should use high priority and no tags for Plan Review", () => {
     const result = formatToolInfo({
       hook_event_name: "PermissionRequest",
       tool_name: "ExitPlanMode",
@@ -407,7 +407,7 @@ describe("formatToolInfo (rich enrichment)", () => {
     });
     assert.ok(!("tags" in result), "no tags emitted");
     assert.equal(result.subtitle, "Claude Code: `Plan Review`");
-    assert.equal(result.priority, PRIORITY.default);
+    assert.equal(result.priority, PRIORITY.high);
   });
 });
 
@@ -485,28 +485,37 @@ describe("formatStopNotification", () => {
       last_assistant_message: "All done. Refactored auth.",
     });
     // Title = \ud83c\udfc1 [proj\u00b7sid]; the "Claude Code: Done" label is the card subtitle in message.
-    assert.equal(r.title, "\ud83c\udfc1 [ai-stack\u00b7abcdef]");
-    assert.equal(r.message, "##### Claude Code: `Done`\n---\nAll done. Refactored auth.");
+    assert.equal(r.title, "\ud83c\udfc1 完成 [ai-stack\u00b7abcdef]");
+    assert.equal(r.message, "##### Claude Code: `Done`\nAll done. Refactored auth.");
     assert.ok(!("tags" in r), "no tags emitted (\ud83c\udfc1 state emoji is in the title)");
-    assert.equal(r.priority, PRIORITY.default);
+    assert.equal(r.priority, PRIORITY.low);
   });
 
   it("falls back to 'Task complete.' when no message", () => {
     const r = formatStopNotification({ cwd: "/x/proj" });
-    assert.equal(r.title, "\ud83c\udfc1 [proj]");
-    assert.equal(r.message, "##### Claude Code: `Done`\n---\nTask complete.");
+    assert.equal(r.title, "\ud83c\udfc1 完成 [proj]");
+    assert.equal(r.message, "##### Claude Code: `Done`\nTask complete.");
   });
 
   it("clips a long message body to 400 chars with ellipsis", () => {
     const r = formatStopNotification({ last_assistant_message: "y".repeat(600) });
-    // The card header ("##### Claude Code: `Done`\n---\n") prefixes a body clipped to 400 + "...".
-    const body = r.message.slice("##### Claude Code: `Done`\n---\n".length);
+    // The card header ("##### Claude Code: `Done`\n") prefixes a body clipped to 400 + "...".
+    const body = r.message.slice("##### Claude Code: `Done`\n".length);
     assert.ok(body.length <= 403);
     assert.ok(body.endsWith("..."));
   });
 
   it("has no session prefix when cwd/session_id absent", () => {
     const r = formatStopNotification({ last_assistant_message: "hi" });
-    assert.equal(r.title, "\ud83c\udfc1");
+    assert.equal(r.title, "\ud83c\udfc1 完成");
+  });
+});
+
+describe("statusTitle", () => {
+  it("is `<emoji> <label> [tag]` and omits the tag when empty", async () => {
+    const { statusTitle } = await import("../src/ntfy.mjs");
+    assert.equal(statusTitle("pending", "p·abc"), "❓ 待操作 [p·abc]");
+    assert.equal(statusTitle("allow", ""), "✔️ 已批准");
+    assert.equal(statusTitle("terminal", "x"), "🖥️ 终端已答 [x]");
   });
 });

@@ -145,14 +145,14 @@ describe("processHook", () => {
 
   it("should call sendNotification with title and message from formatToolInfo", async () => {
     const deps = createDeps({
-      toolInfo: { title: "Claude Code: Read", message: "/path/to/file.ts" },
+      toolInfo: { title: "[proj·abc123]", tag: "proj·abc123", message: "/path/to/file.ts" },
     });
 
     await processHook(sampleInput, deps);
 
     const callArgs = deps.sendNotification.mock.calls[0].arguments[0];
-    // Pending publish prepends the ❓ state emoji to the (emoji-free) tool title.
-    assert.equal(callArgs.title, "❓ Claude Code: Read");
+    // Pending title = ❓ + 待操作 label + session tag.
+    assert.equal(callArgs.title, "❓ 待操作 [proj·abc123]");
     assert.equal(callArgs.message, "/path/to/file.ts");
   });
 
@@ -542,7 +542,7 @@ describe("processHook", () => {
     await processHook(inputWithSuggestions, deps);
     const callArgs = deps.sendNotification.mock.calls[0].arguments[0];
     assert.equal(callArgs.actions.length, 3, "Should have 3 actions (Approve, Always Approve, Deny)");
-    assert.equal(callArgs.actions[1].label, "Always Approve");
+    assert.equal(callArgs.actions[1].label, "✅ Always Approve");
   });
 
   it("should return updatedPermissions when alwaysAllow is true and permission_suggestions exist", async () => {
@@ -739,31 +739,31 @@ describe("processHook resolved-notification update", () => {
     assert.equal(args.sequenceId, args.requestId);
   });
 
-  it("updates to ✅ state (keeps only the chosen action) on allow", async () => {
+  it("updates to ✔️ state (keeps only the chosen action) on allow", async () => {
     const deps = depsWith({ approved: true });
     await processHook(input, deps);
     assert.equal(deps.updateNotification.mock.callCount(), 1);
     const u = deps.updateNotification.mock.calls[0].arguments[0];
-    assert.ok(u.title.startsWith("✅"), `got: ${u.title}`);
+    assert.ok(u.title.startsWith("✔️"), `got: ${u.title}`);
     assert.equal(u.actions.length, 1);
     assert.equal(u.sequenceId, deps.sendNotification.mock.calls[0].arguments[0].requestId);
   });
 
-  it("updates to ❌ state on deny (keeps only the chosen action)", async () => {
+  it("updates to ✖️ state on deny (keeps only the chosen action)", async () => {
     const deps = depsWith({ approved: false });
     await processHook(input, deps);
     assert.equal(deps.updateNotification.mock.callCount(), 1);
     const u = deps.updateNotification.mock.calls[0].arguments[0];
-    assert.ok(u.title.startsWith("❌"));
+    assert.ok(u.title.startsWith("✖️"));
     assert.equal(u.actions.length, 1);
   });
 
-  it("updates to ⏱️ state on timeout (no actions)", async () => {
+  it("updates to ⏸️ state on timeout (no actions)", async () => {
     const deps = depsWith({ timeout: true });
     await processHook(input, deps);
     assert.equal(deps.updateNotification.mock.callCount(), 1);
     const u = deps.updateNotification.mock.calls[0].arguments[0];
-    assert.ok(u.title.startsWith("⏱️"));
+    assert.ok(u.title.startsWith("⏸️"));
     assert.deepEqual(u.actions, []);
   });
 
@@ -839,20 +839,24 @@ describe("processHook onTimeout", () => {
     const deps = mk("allow", { timeout: true });
     assert.equal(decisionOf(await processHook(input, deps)), "allow");
     const upd = deps.updateNotification.mock.calls[0].arguments[0];
-    assert.match(upd.title, /^✅/);
+    assert.match(upd.title, /^⏱️ 自动批准/);
+    assert.equal(upd.priority, 2, "resolved cards are low priority (FYI)");
     assert.match(upd.message, /auto-approved/);
   });
 
   it("deny: auto-denies", async () => {
     const deps = mk("deny", { timeout: true });
     assert.equal(decisionOf(await processHook(input, deps)), "deny");
-    assert.match(deps.updateNotification.mock.calls[0].arguments[0].title, /^❌/);
+    assert.match(deps.updateNotification.mock.calls[0].arguments[0].title, /^⏱️ 自动拒绝/);
   });
 
-  it("ask: falls back to the terminal with ⏱️", async () => {
+  it("ask: falls back to the terminal with ⏸️ 回终端", async () => {
     const deps = mk("ask", { timeout: true });
     assert.equal(decisionOf(await processHook(input, deps)), "ask");
-    assert.match(deps.updateNotification.mock.calls[0].arguments[0].title, /^⏱️/);
+    const upd = deps.updateNotification.mock.calls[0].arguments[0];
+    assert.match(upd.title, /^⏸️ 回终端/);
+    assert.equal(upd.priority, 3, "B layer (agent waits on you): audible");
+    assert.deepEqual(upd.actions, []);
   });
 
   it("listener error is ⚠️ and always asks, regardless of onTimeout", async () => {

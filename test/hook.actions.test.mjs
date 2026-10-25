@@ -49,8 +49,8 @@ describe("buildActions", () => {
   it("should have Approve as the first action and Deny as the second", () => {
     const actions = buildActions("https://ntfy.sh", "my-topic", "req-002");
 
-    assert.equal(actions[0].label, "Approve");
-    assert.equal(actions[1].label, "Deny");
+    assert.equal(actions[0].label, "✅ Approve");
+    assert.equal(actions[1].label, "❌ Deny");
   });
 
   it("should set action type to 'http' for both actions", () => {
@@ -135,9 +135,9 @@ describe("buildActions", () => {
     const actions = buildActions("https://ntfy.sh", "my-topic", "req-aa2", {
       permissionSuggestions: [{ type: "toolAlwaysAllow", tool: "Bash" }],
     });
-    assert.equal(actions[0].label, "Approve");
-    assert.equal(actions[1].label, "Always Approve");
-    assert.equal(actions[2].label, "Deny");
+    assert.equal(actions[0].label, "✅ Approve");
+    assert.equal(actions[1].label, "✅ Always Approve");
+    assert.equal(actions[2].label, "❌ Deny");
   });
 
   it("should include alwaysAllow: true in Always Approve button body", () => {
@@ -155,8 +155,8 @@ describe("buildActions", () => {
       permissionSuggestions: [],
     });
     assert.equal(actions.length, 2);
-    assert.equal(actions[0].label, "Approve");
-    assert.equal(actions[1].label, "Deny");
+    assert.equal(actions[0].label, "✅ Approve");
+    assert.equal(actions[1].label, "❌ Deny");
   });
 
   it("should return 2 actions when no options object is provided", () => {
