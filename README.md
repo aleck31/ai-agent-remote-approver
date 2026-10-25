@@ -12,7 +12,7 @@ The transport (ntfy) is agent-agnostic; per-agent **adapters** translate each ag
 |---|---|
 | Modern `PermissionRequest` hook (returns `allow`/`deny`/`ask`) | No PreToolUse exit-code hacks, **no keyboard injection** — the phone button *is* the decision. Works on any OS incl. Linux EC2. |
 | **Serverless** — the hook process itself subscribes to the ntfy response topic via SSE | No long-running daemon, **no Tailscale**. |
-| Cherry-picked **rich formatting** | Bash shows description + command, Edit shows a diff, Write shows line count; each card leads with a state emoji + a markdown subtitle. |
+| Cherry-picked **rich formatting** | Bash shows description + command, Edit shows a diff, Write shows line count; each card leads with a state emoji + label and a markdown subtitle. |
 | Timeout → **fall back to CLI** (not deny) | Safe: if the phone never answers, you just get the normal terminal prompt. |
 | Basic-auth support | Lets you point at a **private self-hosted ntfy**. |
 
@@ -22,13 +22,19 @@ Tailscale, the local HTTP callback server, Windows `SendKeys` keyboard injection
 ## Features
 
 - **Approve / Deny / Always-Approve** (Always-Approve writes back `updatedPermissions`).
-- **One status emoji per card** — the title leads with the state: ❓ pending · ✅ approved · ❌ denied · 💬 answered · ⏱️ timed out → CLI · ⚠️ listener error → CLI · 🖥️ answered in terminal · 🏁 turn finished.
-- **Notification resolves in place** — after you tap, the pending prompt is *replaced* (via ntfy `sequence_id`): the title emoji flips to the outcome and only the chosen button is kept (`Approved ✔` / `Denied ✖` / the picked option). No "both buttons ticked" confusion; the decision stays in history.
+- **Three card tiers, so you can tell "tap me" from "FYI" at a glance** — one emoji + a short label lead every title; colour intensity tracks how much a card needs you, and only tier A has buttons (the saturated ✅/❌ live on the buttons):
+
+  | Tier | Cards | Title | Priority |
+  |---|---|---|---|
+  | **A · act now** | permission, question, plan review | ❓ 待操作 | high (sound + pop-up) |
+  | **B · come back** | timed out → terminal, listener error, turn finished | ⏸️ 回终端 · ⚠️ 出错·回终端 · 🏁 完成 | default (finished: low) |
+  | **C · FYI** | your decision, answered in terminal, automatic outcome | ✔️ 已批准 · ✖️ 已拒绝 · 💬 已回答 · 🖥️ 终端已答 · ⏱️ 自动批准 / 自动拒绝 | low (silent) |
+- **Notification resolves in place** — after you tap, the pending prompt is *replaced* (via ntfy `sequence_id`): the title flips to the outcome (tier C, silent) and only the chosen button is kept (`Approved ✔` / `Denied ✖` / the picked option). No "both buttons ticked" confusion; the decision stays in history.
 - **Terminal-first answers are noticed** — if you answer the prompt in the terminal before the phone, the pending card is flipped to 🖥️ *Answered in terminal* (detected by watching the session transcript, since Claude Code neither signals nor kills a running hook).
 - **Distinguish concurrent sessions**: each title carries a `[project·sessionid]` tag (project = basename of `cwd`, sessionid = first 6 chars of `session_id`), so multiple sessions are told apart. Routing is isolated per request via a random `requestId`; the tag is just visual.
 - **AskUserQuestion** — option buttons on your phone (auto-batched into groups of 3, ntfy's action limit; multiple questions asked one card at a time).
 - **Plan review** (`ExitPlanMode`) with a longer, separate timeout.
-- **Rich previews** in a markdown card (`Claude Code: \`<tool>\`` subtitle + rule + preview): Bash (description + fenced command), Edit (fenced diff), Write (line count), Read/Glob/Grep/WebFetch/WebSearch/Task.
+- **Rich previews** in a markdown card (`Claude Code: \`<tool>\`` subtitle + preview): Bash (description + fenced command), Edit (fenced diff), Write (line count), Read/Glob/Grep/WebFetch/WebSearch/Task.
 - **Self-hosted ntfy + Basic auth.**
 - **Retry with backoff**, and a configurable **timeout action** (`onTimeout`: terminal / auto-approve / auto-deny).
 
@@ -221,7 +227,7 @@ The hooks are registered under `hooks.PermissionRequest` (approve/deny + AskUser
 ## What changed vs the base (claude-remote-approver)
 
 - **Rich per-tool previews** (`src/ntfy.mjs`): `formatToolInfo` → `formatToolPreview`, rendered as a markdown card (`subtitle()` + `cardBody()`). The JSON-fallback contract (missing primary field → raw `JSON.stringify(tool_input)`) is preserved.
-- **Card format**: title = state emoji + `[project·sessionid]`; markdown body = `Claude Code: \`<tool>\`` subtitle + rule + preview; buttons separate.
+- **Card format**: title = state emoji + label + `[project·sessionid]`; markdown body = `Claude Code: \`<tool>\`` subtitle + preview (no rule); buttons separate. Buttons: `✅ Approve` / `✅ Always Approve` / `❌ Deny`.
 - **Resolve-in-place** (`sequence_id`): after a decision the notification is replaced — outcome emoji in the title, only the chosen button kept (`updateNotification` in `src/adapters/claude-code.mjs`).
 - **Completion notification** (`notifyOnStop`): opt-in `Stop` hook (`processStop` + `formatStopNotification`), registered alongside `PermissionRequest`.
 - **Split install**: `init` (config + topic) and `enable` (hook registration) are separate; hooks use the stable `remote-approver` command when installed on `$PATH`.

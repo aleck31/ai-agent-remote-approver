@@ -29,7 +29,7 @@ Claude Code ──spawn──▶ node bin/cli.mjs hook          (per event, stdi
 |---|---|
 | `bin/cli.mjs` | CLI entry: `init/enable/upgrade[ --check]/disable/test[ --wait]/status/uninstall/hook`. Reads stdin, calls the adapter's `processHook`, writes decision to stdout. Wires deps (incl. `updateNotification = sendNotification`). `test --wait` does a full round-trip check (publish an Ack button, block on `waitForResponse`). |
 | `src/adapters/claude-code.mjs` | Claude Code adapter: `processHook`, `processAskUserQuestion`, `processStop`, `buildActions`, `sendWithRetry`, `sendResolved`, `ASK`/`DENY` constants. Translates the CC hook contract to the shared ntfy core. |
-| `src/ntfy.mjs` | Agent-agnostic ntfy core: `sendNotification`, `waitForResponse` (SSE), `formatToolInfo`/`formatToolPreview`, `sessionTag`, `formatStopNotification`, `stripMarkdown`, `PRIORITY`. |
+| `src/ntfy.mjs` | Agent-agnostic ntfy core (incl. the card visual language: `STATUS` emoji, `STATUS_LABEL`, `statusTitle`, `PRIORITY`): `sendNotification`, `waitForResponse` (SSE), `formatToolInfo`/`formatToolPreview`, `sessionTag`, `formatStopNotification`, `stripMarkdown`, `PRIORITY`. |
 | `src/config.mjs` | Load/validate/save config (single XDG path); `generateTopic`; `resolveAuth`. |
 | `src/upgrade.mjs` | GitHub-release lookup for `upgrade`: `fetchLatestRelease` (API `releases/latest`), `compareVersions`, `assetUrl` (`remote-approver.tgz` asset). `upgrade` runs `npm install -g <asset>` then the NEW binary's `enable` (which also runs `upgradeConfig`). |
 | `src/terminal-watch.mjs` | `watchTerminalAnswer`: polls the session transcript (`transcript_path`) for the `tool_result` of the pending call (matched by tool name + input; the hook input has no `tool_use_id`). Claude Code does not signal or kill a hook whose terminal dialog was answered first, so this is the only cue. |
@@ -45,7 +45,7 @@ Claude Code ──spawn──▶ node bin/cli.mjs hook          (per event, stdi
 5. Otherwise:
    - `requestId = crypto.randomUUID()` — the anchor that keeps concurrent sessions from crossing.
    - `formatToolInfo(input)` → `{ title (with [project·sid] prefix), message, priority, tags, markdown }`.
-   - `buildActions(...)` → Approve / Deny (+ Always-Approve when `permission_suggestions` present). Each button is an ntfy `http` action that POSTs `{requestId, approved[, alwaysAllow]}` to `{topic}-response`.
+   - `buildActions(...)` → `✅ Approve` / `❌ Deny` (+ `✅ Always Approve` when `permission_suggestions` present). Each button is an ntfy `http` action that POSTs `{requestId, approved[, alwaysAllow]}` to `{topic}-response`.
    - `waitForResponse` subscribes to `{topic}-response/json` (SSE) first, then publishes the notification (`sequenceId = requestId`, via `sendWithRetry`) from inside its `onReady` callback — so a fast tap can't land in a publish→subscribe gap and be lost. If the publish fails after retries → `ASK`. It then resolves on the **first** message whose `requestId` matches. Timeout = `planTimeout` for `ExitPlanMode`, else `timeout`.
    - Map the response:
      - `approved === false` → `DENY`
@@ -53,7 +53,7 @@ Claude Code ──spawn──▶ node bin/cli.mjs hook          (per event, stdi
      - else → `allow`
      - timeout → per `config.onTimeout`: `ask` → `ASK` (default), `allow` → allow, `deny` → deny with a reason message (`AskUserQuestion`: `allow` picks the first option); the card notes it was automatic
      - listener error → `ASK` regardless of `onTimeout`; card shows ⚠️
-   - `sendResolved(...)` publishes a same-`sequenceId` update: button-less, low priority, title `✅/❌/💬/⏱️ · <original>` — flips the phone notification from *pending* to *resolved* while preserving history.
+   - `sendResolved(...)` publishes a same-`sequenceId` update: button-less, title = `statusTitle(...)` (emoji + label + tag; tier C low priority, tier B default) — flips the phone notification from *pending* to *resolved* while preserving history.
    - The phone wait runs alongside `watchTerminalAnswer`; if the terminal answers first the wait is aborted (`waitForResponse` `signal` → `{ cancelled }`), the card flips to 🖥️ and the hook returns `ASK` (ignored by Claude Code).
    - Return the decision as `{ hookSpecificOutput: { hookEventName: "PermissionRequest", decision } }`.
 
